@@ -1,0 +1,109 @@
+// データの保存先を切り替える層。
+// 画面側は Store の関数だけを使うので、保存先が Firestore でもブラウザ内でも同じ書き方になる。
+
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  updateDoc,
+  type Firestore,
+} from 'firebase/firestore';
+import type { CollectionName } from './types';
+
+type Data = Record<string, unknown>;
+
+export interface Store {
+  mode: 'firebase' | 'local';
+  subscribe<T>(col: CollectionName, cb: (items: T[]) => void, onError: (e: Error) => void): () => void;
+  add(col: CollectionName, data: Data): Promise<string>;
+  update(col: CollectionName, id: string, patch: Data): Promise<void>;
+  remove(col: CollectionName, id: string): Promise<void>;
+}
+
+/**
+ * Firestore に保存する。データは workspaces/{workspaceId}/{events|shifts|tasks|deadlines} に入る。
+ * workspace（作業スペース）単位で分けておくことで、将来チーム・企業での共有に広げられる。
+ */
+export function createFirestoreStore(db: Firestore, workspaceId: string): Store {
+  const col = (name: CollectionName) => collection(db, 'workspaces', workspaceId, name);
+  return {
+    mode: 'firebase',
+    subscribe(name, cb, onError) {
+      return onSnapshot(
+        col(name),
+        (snap) => cb(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as never)),
+        onError,
+      );
+    },
+    async add(name, data) {
+      const now = Date.now();
+      const ref = await addDoc(col(name), { ...data, createdAt: now, updatedAt: now });
+      return ref.id;
+    },
+    async update(name, id, patch) {
+      await updateDoc(doc(col(name), id), { ...patch, updatedAt: Date.now() });
+    },
+    async remove(name, id) {
+      await deleteDoc(doc(col(name), id));
+    },
+  };
+}
+
+/**
+ * お試しモード：このブラウザの localStorage にだけ保存する。
+ * Firebase 未設定でも画面を使って確かめられるようにするためのもので、他の端末とは共有されない。
+ */
+export function createLocalStore(): Store {
+  const key = (name: CollectionName) => `shiftapp:v1:${name}`;
+  const listeners = new Map<CollectionName, Set<(items: unknown[]) => void>>();
+
+  const read = (name: CollectionName): Data[] => {
+    try {
+      return JSON.parse(localStorage.getItem(key(name)) || '[]');
+    } catch {
+      return [];
+    }
+  };
+  const write = (name: CollectionName, items: Data[]) => {
+    localStorage.setItem(key(name), JSON.stringify(items));
+    listeners.get(name)?.forEach((l) => l(items));
+  };
+
+  return {
+    mode: 'local',
+    subscribe(name, cb) {
+      const set = listeners.get(name) ?? new Set();
+      listeners.set(name, set);
+      const l = cb as (items: unknown[]) => void;
+      set.add(l);
+      // 別タブでの変更も反映する
+      const onStorage = (e: StorageEvent) => e.key === key(name) && l(read(name));
+      window.addEventListener('storage', onStorage);
+      queueMicrotask(() => l(read(name)));
+      return () => {
+        set.delete(l);
+        window.removeEventListener('storage', onStorage);
+      };
+    },
+    async add(name, data) {
+      const id = crypto.randomUUID();
+      const now = Date.now();
+      write(name, [...read(name), { ...data, id, createdAt: now, updatedAt: now }]);
+      return id;
+    },
+    async update(name, id, patch) {
+      write(
+        name,
+        read(name).map((item) => (item.id === id ? { ...item, ...patch, updatedAt: Date.now() } : item)),
+      );
+    },
+    async remove(name, id) {
+      write(
+        name,
+        read(name).filter((item) => item.id !== id),
+      );
+    },
+  };
+}

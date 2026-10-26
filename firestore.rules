@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// データの保護ルール。ログインした本人（作業スペースのメンバー）以外は読み書きできない。
+// 反映するには：Firebaseコンソール → Firestore → ルール に貼り付けて「公開」
+//               または  firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(wid) {
+      return signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/workspaces/$(wid)).data.members;
+    }
+
+    match /workspaces/{wid} {
+      // 自分専用スペース（ID = 自分のユーザーID）は、まだ存在しなくても確認できるようにする
+      allow read: if signedIn() && (wid == request.auth.uid || isMember(wid));
+
+      // 作れるのは自分専用スペースだけ。メンバーは自分のみ、プランは free から始まる
+      allow create: if signedIn()
+        && wid == request.auth.uid
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.members.keys().hasOnly([request.auth.uid])
+        && request.resource.data.plan == 'free';
+
+      // メンバー・プランの変更は将来の管理画面／課金処理（サーバー側）で行うため、アプリからは不可
+      allow update, delete: if false;
+
+      match /{col}/{docId} {
+        allow read, write: if isMember(wid)
+          && col in ['events', 'shifts', 'tasks', 'deadlines'];
+      }
+    }
+
+    // 上記以外はすべて拒否
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
