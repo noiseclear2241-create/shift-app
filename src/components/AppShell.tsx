@@ -27,15 +27,22 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (status === 'ready' && onLogin) router.replace('/');
   }, [status, onLogin, router]);
 
-  if (onLogin) return <main className="login-main">{children}</main>;
-
+  // ログイン後の準備で失敗した場合は、ログイン画面でもエラーを表示する（何も起きないように見えるのを防ぐ）
   if (status === 'error') {
     return (
       <main className="center-msg">
-        <p>データの準備中にエラーが発生しました。</p>
+        <p>ログイン後のデータの準備でエラーが発生しました。</p>
         <p className="muted small">{error}</p>
+        <button className="btn btn-outline" onClick={signOut}>
+          ログアウトしてやり直す
+        </button>
       </main>
     );
+  }
+
+  if (onLogin) {
+    if (status === 'loading' || status === 'ready') return <main className="center-msg muted">読み込み中…</main>;
+    return <main className="login-main">{children}</main>;
   }
   if (status !== 'ready' || !store) {
     return <main className="center-msg muted">読み込み中…</main>;

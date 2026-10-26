@@ -57,12 +57,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setStatus('signedOut');
         return;
       }
+      // ログイン直後〜作業スペースの準備が終わるまでは「読み込み中」にする
+      setStatus('loading');
       try {
         await ensureWorkspace(u);
         setStore(createFirestoreStore(db, u.uid));
         setStatus('ready');
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        const code = (e as { code?: string })?.code ?? '';
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(
+          code === 'permission-denied'
+            ? `データベースへのアクセスが拒否されました。Firestore のルールが公開されているか確認してください。（${msg}）`
+            : msg,
+        );
         setStatus('error');
       }
     });
