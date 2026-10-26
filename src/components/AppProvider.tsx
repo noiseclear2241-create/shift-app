@@ -61,7 +61,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setStatus('loading');
       try {
         await ensureWorkspace(u);
-        setStore(createFirestoreStore(db, u.uid));
+        setStore(createFirestoreStore(db, u.uid, u.uid));
         setStatus('ready');
       } catch (e) {
         const code = (e as { code?: string })?.code ?? '';

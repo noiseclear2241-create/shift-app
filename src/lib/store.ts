@@ -6,11 +6,13 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
+  setDoc,
   updateDoc,
   type Firestore,
 } from 'firebase/firestore';
-import type { CollectionName } from './types';
+import { DEFAULT_NOTIFICATION_PREFS, type CollectionName, type NotificationPrefs } from './types';
 
 type Data = Record<string, unknown>;
 
@@ -20,14 +22,27 @@ export interface Store {
   add(col: CollectionName, data: Data): Promise<string>;
   update(col: CollectionName, id: string, patch: Data): Promise<void>;
   remove(col: CollectionName, id: string): Promise<void>;
+  /** 通知設定（ユーザーごと）。未保存なら初期値を返す */
+  getPrefs(): Promise<NotificationPrefs>;
+  savePrefs(prefs: NotificationPrefs): Promise<void>;
 }
+
+const withDefaults = (saved: Partial<NotificationPrefs> | undefined): NotificationPrefs => ({
+  ...DEFAULT_NOTIFICATION_PREFS,
+  ...saved,
+});
+
+/** 利用者の端末のタイムゾーン（サーバーから通知を送るときに「今日」を正しく判定するため保存する） */
+const deviceTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
 
 /**
  * Firestore に保存する。データは workspaces/{workspaceId}/{events|shifts|tasks|deadlines} に入る。
  * workspace（作業スペース）単位で分けておくことで、将来チーム・企業での共有に広げられる。
+ * 通知設定は人ごとの設定なので users/{uid} に置く。
  */
-export function createFirestoreStore(db: Firestore, workspaceId: string): Store {
+export function createFirestoreStore(db: Firestore, workspaceId: string, uid: string): Store {
   const col = (name: CollectionName) => collection(db, 'workspaces', workspaceId, name);
+  const userRef = doc(db, 'users', uid);
   return {
     mode: 'firebase',
     subscribe(name, cb, onError) {
@@ -47,6 +62,17 @@ export function createFirestoreStore(db: Firestore, workspaceId: string): Store 
     },
     async remove(name, id) {
       await deleteDoc(doc(col(name), id));
+    },
+    async getPrefs() {
+      const snap = await getDoc(userRef);
+      return withDefaults(snap.data()?.notifications);
+    },
+    async savePrefs(prefs) {
+      await setDoc(
+        userRef,
+        { notifications: prefs, timezone: deviceTimeZone(), workspaceId, updatedAt: Date.now() },
+        { merge: true },
+      );
     },
   };
 }
@@ -104,6 +130,16 @@ export function createLocalStore(): Store {
         name,
         read(name).filter((item) => item.id !== id),
       );
+    },
+    async getPrefs() {
+      try {
+        return withDefaults(JSON.parse(localStorage.getItem('shiftapp:v1:prefs') || '{}'));
+      } catch {
+        return withDefaults(undefined);
+      }
+    },
+    async savePrefs(prefs) {
+      localStorage.setItem('shiftapp:v1:prefs', JSON.stringify(prefs));
     },
   };
 }

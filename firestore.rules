@@ -35,6 +35,16 @@ service cloud.firestore {
       }
     }
 
+    // ユーザーごとの設定（通知のオン・オフなど）と、プッシュ通知を受け取る端末の登録。本人だけが読み書きできる。
+    // 通知の送信記録はサーバー（管理者権限）だけが書くので、ここでは許可しない。
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+
+      match /devices/{deviceId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
     // 上記以外はすべて拒否
     match /{document=**} {
       allow read, write: if false;

@@ -58,6 +58,19 @@ export interface Deadline extends Timestamps {
   notes: string;
 }
 
+/** 通知の種類ごとのオン・オフ（ユーザーごとに users/{uid} に保存） */
+export interface NotificationPrefs {
+  deadline: boolean; // 提出期限（3日前・前日・当日）
+  nextShift: boolean; // 明日の出勤（確定のみ）
+  todayDigest: boolean; // 今日の予定・期限切れタスク
+}
+
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
+  deadline: true,
+  nextShift: true,
+  todayDigest: true,
+};
+
 export const SHIFT_STATUS_LABEL: Record<ShiftStatus, string> = {
   confirmed: '確定',
   tentative: '未確定',

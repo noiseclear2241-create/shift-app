@@ -61,23 +61,23 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div className="sidebar-foot">
-          <div className="small muted">{userName}</div>
-          {store.mode === 'firebase' && (
-            <button className="btn-link small" onClick={signOut}>
-              ログアウト
-            </button>
-          )}
+          <Link href="/settings" className={`side-link ${isActive(path, '/settings') ? 'active' : ''}`}>
+            <Icon name="gear" />
+            設定
+          </Link>
+          <div className="small muted" style={{ padding: '0 12px' }}>
+            {userName}
+          </div>
         </div>
       </aside>
 
       <div className="content">
         <header className="topbar">
           <span className="brand">シフト手帳</span>
-          {store.mode === 'firebase' && (
-            <button className="btn-link small" onClick={signOut}>
-              ログアウト
-            </button>
-          )}
+          <Link href="/settings" className="topbar-link" aria-label="設定">
+            <Icon name="gear" />
+            設定
+          </Link>
         </header>
         {store.mode === 'local' && (
           <div className="trial-banner">
