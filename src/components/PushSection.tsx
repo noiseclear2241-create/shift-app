@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useApp } from './AppProvider';
-import { disablePush, enablePush, getPushStatus, sendTestPush, type PushStatus } from '@/lib/push';
+import { disablePush, enablePush, getPushStatus, sendMorningNow, sendTestPush, type PushStatus } from '@/lib/push';
 
 /** 設定画面の「この端末で通知を受け取る」部分 */
 export function PushSection() {
@@ -52,6 +52,13 @@ export function PushSection() {
       const r = await sendTestPush();
       return `テスト通知を送りました（${r.sent}台に送信${r.failed ? `・${r.failed}台は失敗` : ''}）。数秒〜1分ほどで届きます。`;
     });
+  const onMorningNow = () =>
+    run(async () => {
+      const r = await sendMorningNow();
+      if (r.total === 0) return '今日の朝に送る通知はありません（予定・期限・通知の設定を確認してください）。';
+      if (r.sent === 0 && r.skipped > 0) return '今日の通知はすでに送信済みです（同じ通知は1日1回だけ送ります）。';
+      return `今朝の通知を${r.sent}件送りました${r.skipped ? `（${r.skipped}件は送信済みのため省略）` : ''}。`;
+    });
   const onDisable = () =>
     run(async () => {
       await disablePush(uid);
@@ -77,6 +84,9 @@ export function PushSection() {
           <p className="ok-msg">この端末は通知を受け取る設定になっています。</p>
           <button className="btn btn-primary" disabled={busy} onClick={onTest}>
             テスト通知を送る
+          </button>
+          <button className="btn btn-outline" disabled={busy} onClick={onMorningNow}>
+            今朝の通知を今すぐ受け取る（お試し）
           </button>
           <button className="btn btn-outline" disabled={busy} onClick={onDisable}>
             この端末の通知をやめる

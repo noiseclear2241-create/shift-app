@@ -89,11 +89,11 @@ export async function disablePush(uid: string) {
   localStorage.removeItem(DEVICE_KEY);
 }
 
-/** サーバーに、自分の登録端末すべてへテスト通知を送ってもらう */
-export async function sendTestPush(): Promise<{ sent: number; failed: number }> {
+/** ログイン証明を付けてサーバーの通知処理を呼ぶ */
+async function callNotifyApi<T>(path: string): Promise<T> {
   const user = getFirebase().auth.currentUser;
   if (!user) throw new Error('ログインしていません');
-  const res = await fetch('/api/notify/test', {
+  const res = await fetch(path, {
     method: 'POST',
     headers: { Authorization: `Bearer ${await user.getIdToken()}` },
   });
@@ -101,3 +101,10 @@ export async function sendTestPush(): Promise<{ sent: number; failed: number }> 
   if (!res.ok) throw new Error(body.error || `送信に失敗しました（${res.status}）`);
   return body;
 }
+
+/** サーバーに、自分の登録端末すべてへテスト通知を送ってもらう */
+export const sendTestPush = () => callNotifyApi<{ sent: number; failed: number }>('/api/notify/test');
+
+/** 毎朝の自動送信と同じ通知を、今すぐ自分の分だけ送ってもらう */
+export const sendMorningNow = () =>
+  callNotifyApi<{ total: number; sent: number; skipped: number }>('/api/notify/morning');

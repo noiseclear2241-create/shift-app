@@ -148,7 +148,7 @@ export default function SettingsPage() {
           <b>この端末で通知を受け取る</b>
           <PushSection />
           <p className="small muted" style={{ margin: 0 }}>
-            毎朝の自動送信は次の更新で始まります。それまでは「テスト通知を送る」で届くか確認できます。
+            登録した端末には、毎朝7時台に自動で届きます（サーバーの都合で、時刻は7時〜8時の間で前後します）。同じ通知は1日1回だけ送ります。
           </p>
         </div>
       </section>

@@ -1,6 +1,6 @@
 // テスト通知：ログイン中の本人の登録端末すべてに、その場で通知を1件送る。
-import { getAuth } from 'firebase-admin/auth';
 import { NextResponse } from 'next/server';
+import { verifyRequestUser } from '@/lib/server/auth';
 import { getAdminApp } from '@/lib/server/firebaseAdmin';
 import { sendPushToUser } from '@/lib/server/sendPush';
 
@@ -16,15 +16,8 @@ export async function POST(req: Request) {
     );
   }
 
-  // 本人確認：画面から送られたログイン証明（IDトークン）を Firebase で検証する
-  const idToken = req.headers.get('authorization')?.replace(/^Bearer /, '');
-  if (!idToken) return NextResponse.json({ error: 'ログインが必要です' }, { status: 401 });
-  let uid: string;
-  try {
-    uid = (await getAuth(app).verifyIdToken(idToken)).uid;
-  } catch {
-    return NextResponse.json({ error: 'ログインの確認ができませんでした。もう一度ログインしてください' }, { status: 401 });
-  }
+  const uid = await verifyRequestUser(app, req);
+  if (!uid) return NextResponse.json({ error: 'ログインが必要です' }, { status: 401 });
 
   try {
     const result = await sendPushToUser(app, uid, {

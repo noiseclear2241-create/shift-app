@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMorningNotifications, nextMorning } from './notifications.ts';
+import { buildMorningNotifications, nextMorning, todayIn } from './notifications.ts';
 import { DEFAULT_NOTIFICATION_PREFS, type Deadline, type EventItem, type Shift, type Task } from './types.ts';
 
 const base = { createdAt: 0, updatedAt: 0, notes: '' };
@@ -75,6 +75,13 @@ test('オフにした種類は送らない', () => {
     { deadline: false, nextShift: true, todayDigest: true },
   );
   assert.deepEqual(list.map((n) => n.kind), ['nextShift']);
+});
+
+test('タイムゾーンごとの今日（定時実行は世界標準時22時＝日本時間7時）', () => {
+  const at = new Date('2026-10-26T22:30:00Z');
+  assert.equal(todayIn('Asia/Tokyo', at), '2026-10-27');
+  assert.equal(todayIn('UTC', at), '2026-10-26');
+  assert.equal(todayIn('Not/AZone', at), '2026-10-27');
 });
 
 test('次の朝の判定', () => {

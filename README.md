@@ -75,7 +75,14 @@ users/{ユーザーID}                 … 人ごとの設定：notifications（
 ## アイコン
 `public/icons/` のアイコンは `node scripts/make-icons.mjs` で作り直せます。
 
+## プッシュ通知
+- 設定画面の「この端末で通知を受け取る」で端末を登録（iPhone はホーム画面に追加したアプリから）
+- 毎朝の自動送信：`vercel.json` の定時実行が `/api/cron/morning` を毎日 22:00（世界標準時）＝日本時間 7:00 に呼ぶ
+  - Vercel の無料プランでは、実行時刻が指定した1時間の中で前後する
+- 通知の中身：`src/lib/notifications.ts`（提出期限3日前・前日・当日／明日の確定出勤／今日の予定）
+- 同じ通知は1日1回だけ：送信記録 `workspaces/{ID}/notificationLog` で管理
+- 必要な環境変数：`NEXT_PUBLIC_FIREBASE_VAPID_KEY`（公開値）、`FIREBASE_SERVICE_ACCOUNT`・`CRON_SECRET`（秘密情報）
+
 ## 今後の予定（まだ無い機能）
-- プッシュ通知の受け取り登録と、毎朝7時台の自動送信（通知の中身を決める処理は `src/lib/notifications.ts` に作成済み）
 - チーム・企業でのデータ共有、招待、権限管理
 - 広告・アフィリエイトの管理画面、有料プラン・決済

@@ -90,6 +90,20 @@ export function buildMorningNotifications(
   return list;
 }
 
+/**
+ * 指定したタイムゾーンでの「今日」（YYYY-MM-DD）。
+ * サーバーは世界標準時で動くため、利用者の地域の日付に直してから通知の対象を決める。
+ */
+export function todayIn(timeZone: string, at: Date = new Date()): string {
+  const format = (tz: string) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+  try {
+    return format(timeZone);
+  } catch {
+    return format('Asia/Tokyo'); // 不正なタイムゾーンが保存されていた場合
+  }
+}
+
 /** 現在時刻から「次の朝の通知」が対象にする日（朝7時より前なら今日、以降なら明日） */
 export function nextMorning(now: Now): string {
   return now.time < '07:00' ? now.date : addDays(now.date, 1);
