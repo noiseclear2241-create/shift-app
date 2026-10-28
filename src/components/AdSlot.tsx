@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { callApi } from '@/lib/api';
 import type { ServedAd } from '@/lib/types';
+import { AdCard } from './AdCard';
 import { useApp } from './AppProvider';
 
 /**
@@ -45,20 +46,7 @@ export function AdSlot({ slot }: { slot: 'home' }) {
 
   return (
     <div ref={ref} className="ad-slot" aria-live="polite">
-      {ad && (
-        <a href={ad.clickUrl} target="_blank" rel="sponsored noopener noreferrer" className="ad-card">
-          <span className="ad-label">PR</span>
-          {ad.imageUrl && (
-            // 広告会社の画像はサイズが決まっていないため、枠に収める
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={ad.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="ad-image" />
-          )}
-          <span className="ad-body">
-            <span className="ad-title">{ad.title}</span>
-            {ad.description && <span className="small muted">{ad.description}</span>}
-          </span>
-        </a>
-      )}
+      {ad && <AdCard title={ad.title} description={ad.description} imageUrl={ad.imageUrl} href={ad.clickUrl} />}
     </div>
   );
 }

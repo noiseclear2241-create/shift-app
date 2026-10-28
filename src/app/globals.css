@@ -1161,6 +1161,18 @@ textarea {
   min-width: 0;
   padding-right: 28px;
 }
+/* 横長のバナー（468×60 など）は、幅いっぱいに大きく表示する */
+.ad-card.is-wide {
+  flex-direction: column;
+  align-items: stretch;
+}
+.ad-card.is-wide .ad-image {
+  width: 100%;
+  height: auto;
+  max-height: 120px;
+  object-fit: contain;
+  background: none;
+}
 .ad-title {
   font-weight: 700;
   word-break: break-word;

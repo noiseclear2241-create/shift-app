@@ -64,6 +64,58 @@ export function validateAdInput(raw: Record<string, unknown>): { ad: AdInput } |
   return { ad };
 }
 
+export interface ParsedAdCode {
+  linkUrl: string;
+  imageUrl: string;
+  /** バナー画像の大きさ（コードに書かれていれば） */
+  width: number;
+  height: number;
+  /** テキスト広告のときのリンクの文字 */
+  text: string;
+}
+
+/**
+ * A8.net・楽天などの広告コード（HTML）から、リンク先URLと画像URLを取り出す。
+ * コードそのものは保存・実行しない（取り出した https のURLだけを使う）。
+ * 表示回数を数えるための 1×1 の画像は、バナー画像として扱わない。
+ */
+export function parseAdCode(html: string): ParsedAdCode | { error: string } {
+  const attr = (tag: string, name: string) => {
+    const m = tag.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'));
+    return (m?.[1] ?? m?.[2] ?? m?.[3] ?? '').replace(/&amp;/g, '&').trim();
+  };
+  const anchor = html.match(/<a\b[^>]*>([\s\S]*?)<\/a>/i);
+  if (!anchor) return { error: '広告コードの中にリンク（<a href="...">）が見つかりません' };
+  const linkUrl = attr(anchor[0].match(/<a\b[^>]*>/i)?.[0] ?? '', 'href');
+  if (!isHttpsUrl(linkUrl)) return { error: 'リンク先が https:// で始まるURLではありません' };
+
+  // バナー画像：リンクの中の画像のうち、1×1 の目印ではないもの
+  const images = [...anchor[1].matchAll(/<img\b[^>]*>/gi)].map((m) => ({
+    src: attr(m[0], 'src'),
+    width: Number(attr(m[0], 'width')) || 0,
+    height: Number(attr(m[0], 'height')) || 0,
+  }));
+  const banner = images.find((i) => isHttpsUrl(i.src) && !(i.width === 1 && i.height === 1));
+  const text = anchor[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+
+  return {
+    linkUrl,
+    imageUrl: banner?.src ?? '',
+    width: banner?.width ?? 0,
+    height: banner?.height ?? 0,
+    text,
+  };
+}
+
+/** バナーの形。広告枠に合うのは正方形に近いもの（square）か横長（wide） */
+export function bannerShape(width: number, height: number): 'square' | 'wide' | 'tall' | 'unknown' {
+  if (!width || !height) return 'unknown';
+  const ratio = width / height;
+  if (ratio >= 2) return 'wide';
+  if (ratio <= 0.6) return 'tall';
+  return 'square';
+}
+
 /** クリック率（%）。表示が0回なら 0 */
 export const clickRate = (impressions: number, clicks: number) =>
   impressions > 0 ? Math.round((clicks / impressions) * 1000) / 10 : 0;

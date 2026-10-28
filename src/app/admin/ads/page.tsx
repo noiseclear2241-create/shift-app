@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useApp } from '@/components/AppProvider';
-import { clickRate } from '@/lib/ads';
+import { AdCard } from '@/components/AdCard';
+import { bannerShape, clickRate, parseAdCode } from '@/lib/ads';
 import { callApi } from '@/lib/api';
 import { formatPeriod } from '@/lib/schedule';
 import type { Ad } from '@/lib/types';
@@ -24,6 +25,25 @@ export default function AdminAdsPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  const [code, setCode] = useState('');
+  const [codeNote, setCodeNote] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // 広告コードからリンク先URL・画像URL（テキスト広告ならタイトルも）を自動で入れる
+  const readCode = () => {
+    const r = parseAdCode(code);
+    if ('error' in r) return setCodeNote({ ok: false, text: r.error });
+    setF({ ...f, linkUrl: r.linkUrl, imageUrl: r.imageUrl, title: f.title || (r.imageUrl ? '' : r.text.slice(0, 60)) });
+    const shape = bannerShape(r.width, r.height);
+    const size = r.width && r.height ? `（${r.width}×${r.height}）` : '';
+    setCodeNote({
+      ok: shape !== 'tall',
+      text: !r.imageUrl
+        ? 'リンク先URLを入れました（文字だけの広告）。タイトルと説明を確認してください。'
+        : shape === 'tall'
+          ? `リンク先URLと画像URLを入れました。ただし、この画像は縦長${size}で、広告枠では小さくしか表示されません。正方形（300×250 など）か横長（468×60 など）のバナーを選び直すか、画像URLを消して文字だけの広告にするのがおすすめです。`
+          : `リンク先URLと画像URL${size}を入れました。タイトル（広告の内容が分かる短い文）を入力してください。`,
+    });
+  };
 
   const load = useCallback(async () => {
     try {
@@ -59,6 +79,8 @@ export default function AdminAdsPage() {
 
   const openEdit = (ad?: AdRow) => {
     setMessage(null);
+    setCode('');
+    setCodeNote(null);
     setEditing(ad ? ad.id : 'new');
     setF(
       ad
@@ -139,6 +161,25 @@ export default function AdminAdsPage() {
         <section className="card">
           <h2 style={{ marginBottom: 12 }}>{editing === 'new' ? '広告を追加' : '広告を編集'}</h2>
           <form className="form" onSubmit={save}>
+            <div className="notice-box stack" style={{ gap: 8 }}>
+              <label className="form" style={{ gap: 4 }}>
+                <span style={{ fontWeight: 700 }}>広告コードを貼り付けて自動入力</span>
+                <textarea
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder={'A8.net・楽天などで発行された広告コード（<a href="...">〜</a>）をそのまま貼り付けます'}
+                  rows={4}
+                />
+              </label>
+              <button type="button" className="btn btn-outline" disabled={!code.trim()} onClick={readCode}>
+                コードから読み取る
+              </button>
+              {codeNote && (
+                <p className={codeNote.ok ? 'small' : 'error small'} style={{ margin: 0 }}>
+                  {codeNote.text}
+                </p>
+              )}
+            </div>
             <label>
               タイトル（必須）
               <input value={f.title} onChange={set('title')} maxLength={60} required placeholder="例：催事・イベントのお仕事探しなら〇〇" />
@@ -177,19 +218,9 @@ export default function AdminAdsPage() {
             {f.title && (
               <div>
                 <div className="small muted" style={{ marginBottom: 4 }}>
-                  見本
+                  見本（ホーム画面ではこのように表示されます）
                 </div>
-                <div className="ad-card">
-                  <span className="ad-label">PR</span>
-                  {/^https:\/\//.test(f.imageUrl) && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={f.imageUrl} alt="" className="ad-image" referrerPolicy="no-referrer" />
-                  )}
-                  <span className="ad-body">
-                    <span className="ad-title">{f.title}</span>
-                    {f.description && <span className="small muted">{f.description}</span>}
-                  </span>
-                </div>
+                <AdCard key={f.imageUrl} title={f.title} description={f.description} imageUrl={f.imageUrl} />
               </div>
             )}
 
