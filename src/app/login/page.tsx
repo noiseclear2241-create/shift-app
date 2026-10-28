@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  getRedirectResult,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
 } from 'firebase/auth';
 import { getFirebase, isFirebaseConfigured } from '@/lib/firebase';
 
@@ -22,10 +24,33 @@ const MESSAGES: Record<string, string> = {
   'auth/unauthorized-domain': 'このドメインからのログインが許可されていません（Firebase の承認済みドメインに追加してください）',
 };
 
+const errorCode = (e: unknown) => (e as { code?: string })?.code ?? '';
+
 const toMessage = (e: unknown) => {
-  const code = (e as { code?: string })?.code ?? '';
+  const code = errorCode(e);
   return MESSAGES[code] ?? `ログインできませんでした（${code || '不明なエラー'}）`;
 };
+
+/** LINE・Instagram・Facebook のアプリ内ブラウザ（Google ログインが使えない） */
+const isInAppBrowser = () => /\bLine\/|FBAN|FBAV|Instagram/i.test(navigator.userAgent);
+
+/** ホーム画面に追加したアプリとして開いているか */
+const isStandalone = () =>
+  window.matchMedia('(display-mode: standalone)').matches ||
+  (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+async function signInWithGoogle() {
+  const { auth } = getFirebase();
+  const provider = new GoogleAuthProvider();
+  // ホーム画面のアプリではポップアップ（別ウィンドウ）が使えないため、画面ごと切り替える方式にする
+  if (isStandalone()) return signInWithRedirect(auth, provider);
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (e) {
+    if (errorCode(e) === 'auth/popup-blocked') return signInWithRedirect(auth, provider);
+    throw e;
+  }
+}
 
 export default function LoginPage() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -33,6 +58,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [inApp, setInApp] = useState(false);
+
+  useEffect(() => {
+    setInApp(isInAppBrowser());
+    if (!isFirebaseConfigured) return;
+    // 画面ごと切り替える方式で Google から戻ってきたときのエラーを表示する
+    getRedirectResult(getFirebase().auth).catch((e) => setError(toMessage(e)));
+  }, []);
 
   if (!isFirebaseConfigured) {
     return (
@@ -73,11 +106,13 @@ export default function LoginPage() {
       <h1>シフト手帳</h1>
       <p className="muted">{mode === 'signin' ? 'ログイン' : '新規登録'}</p>
 
-      <button
-        className="btn btn-outline block"
-        disabled={busy}
-        onClick={() => run(() => signInWithPopup(getFirebase().auth, new GoogleAuthProvider()))}
-      >
+      {inApp && (
+        <p className="error small" style={{ margin: 0 }}>
+          LINE などのアプリの中で開いたページでは、Google でのログインが使えません。画面右上や下のメニューから「ブラウザで開く」（Safari・Chrome）を選んでください。メールアドレスでのログインは、このままでも使えます。
+        </p>
+      )}
+
+      <button className="btn btn-outline block" disabled={busy} onClick={() => run(signInWithGoogle)}>
         Google でログイン
       </button>
 
