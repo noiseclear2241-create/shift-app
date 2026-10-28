@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useApp, useStore } from '@/components/AppProvider';
+import { PushSection } from '@/components/PushSection';
 import { useAllData, useNow } from '@/lib/hooks';
 import { buildMorningNotifications, nextMorning } from '@/lib/notifications';
 import { formatDateJa } from '@/lib/schedule';
@@ -143,10 +144,11 @@ export default function SettingsPage() {
             </li>
           ))}
         </ul>
-        <div className="notice-box">
-          <b>プッシュ通知の受け取り</b>
-          <p className="small" style={{ margin: '4px 0 0' }}>
-            この端末で通知を受け取る設定は、次の更新で追加します。それまでは、ホーム画面の「期限が近い・過ぎている項目」と「次の出勤」で確認してください。
+        <div className="notice-box stack" style={{ gap: 8 }}>
+          <b>この端末で通知を受け取る</b>
+          <PushSection />
+          <p className="small muted" style={{ margin: 0 }}>
+            毎朝の自動送信は次の更新で始まります。それまでは「テスト通知を送る」で届くか確認できます。
           </p>
         </div>
       </section>

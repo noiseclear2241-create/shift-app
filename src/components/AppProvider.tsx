@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { onAuthStateChanged, signOut as fbSignOut, type User } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getFirebase, isFirebaseConfigured } from '@/lib/firebase';
+import { refreshPush } from '@/lib/push';
 import { createFirestoreStore, createLocalStore, type Store } from '@/lib/store';
 
 type Status = 'loading' | 'signedOut' | 'ready' | 'error';
@@ -11,6 +12,7 @@ type Status = 'loading' | 'signedOut' | 'ready' | 'error';
 interface AppState {
   status: Status;
   error: string;
+  uid: string;
   userName: string;
   store: Store | null;
   signOut: () => Promise<void>;
@@ -63,6 +65,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await ensureWorkspace(u);
         setStore(createFirestoreStore(db, u.uid, u.uid));
         setStatus('ready');
+        // 通知を登録済みの端末なら、通知用トークンを最新にしておく（失敗しても画面には影響させない）
+        refreshPush(u.uid).catch((e) => console.warn('通知トークンの更新に失敗', e));
       } catch (e) {
         const code = (e as { code?: string })?.code ?? '';
         const msg = e instanceof Error ? e.message : String(e);
@@ -81,6 +85,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       status,
       error,
       store,
+      uid: user?.uid ?? '',
       userName: isFirebaseConfigured ? user?.displayName || user?.email || '' : 'お試しモード',
       signOut: async () => {
         if (isFirebaseConfigured) await fbSignOut(getFirebase().auth);
