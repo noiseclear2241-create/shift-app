@@ -16,6 +16,7 @@ const EMPTY = { title: '', description: '', imageUrl: '', linkUrl: '', weight: '
 export default function AdminAdsPage() {
   const { store } = useApp();
   const [state, setState] = useState<'loading' | 'forbidden' | 'ready'>('loading');
+  const [why, setWhy] = useState<{ email: string; reason: string } | null>(null);
   const [rows, setRows] = useState<AdRow[]>([]);
   const [statsDays, setStatsDays] = useState(30);
   const [editing, setEditing] = useState<string | null>(null); // null：閉じる / 'new' / 広告ID
@@ -32,6 +33,8 @@ export default function AdminAdsPage() {
       setState('ready');
     } catch {
       setState('forbidden');
+      // 運営者として認められない理由を表示する（設定の確認用）
+      callApi<{ email: string; reason: string }>('/api/admin/me', { method: 'GET' }).then(setWhy, () => {});
     }
   }, []);
 
@@ -95,6 +98,12 @@ export default function AdminAdsPage() {
       <div className="card">
         <h1 style={{ fontSize: '1.3rem' }}>広告の管理</h1>
         <p>この画面は運営者だけが使えます。</p>
+        {why && (
+          <div className="notice-box small">
+            <div>ログイン中のメールアドレス：{why.email || '（なし）'}</div>
+            {why.reason && <div style={{ marginTop: 4 }}>{why.reason}</div>}
+          </div>
+        )}
       </div>
     );
   }
