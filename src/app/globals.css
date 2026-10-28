@@ -1018,6 +1018,109 @@ textarea {
   border: 1px solid var(--line);
 }
 
+/* ---------- 紹介ページ（/about） ---------- */
+
+.lp {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+}
+.lp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+}
+.lp-hero {
+  display: grid;
+  gap: 20px;
+  padding: 24px 0 8px;
+}
+.lp-hero h1 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.lp-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.nowrap-line {
+  display: inline-block;
+}
+.lp-hero p {
+  margin: 0;
+  color: var(--muted);
+}
+.lp-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+.lp-shot {
+  margin: 0;
+  max-width: 380px;
+  width: 100%;
+  justify-self: center;
+}
+.lp-shot figcaption {
+  margin-top: 6px;
+  text-align: center;
+}
+.lp-section {
+  padding: 28px 0 0;
+}
+.lp-section h2 {
+  font-size: 1.3rem;
+  margin-bottom: 14px;
+}
+.lp-section h3 {
+  font-size: 1rem;
+  margin-bottom: 6px;
+}
+.lp-section .card p {
+  margin: 0 0 8px;
+  color: var(--text);
+}
+.lp-grid {
+  display: grid;
+  gap: 12px;
+}
+.lp-faq summary {
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 28px;
+}
+.lp-faq p {
+  margin: 8px 0 0 !important;
+}
+.lp-final {
+  text-align: center;
+  padding-top: 36px;
+}
+.lp-footer {
+  margin-top: 36px;
+  text-align: center;
+}
+@media (min-width: 760px) {
+  .lp-hero {
+    grid-template-columns: 1.2fr 1fr;
+    align-items: center;
+    padding-top: 40px;
+  }
+  .lp-hero h1 {
+    font-size: 2.4rem;
+  }
+  .lp-grid.two {
+    grid-template-columns: 1fr 1fr;
+  }
+  .lp-grid.three {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 /* ---------- 広告 ---------- */
 
 .ad-slot {

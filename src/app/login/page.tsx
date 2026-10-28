@@ -145,6 +145,9 @@ export default function LoginPage() {
       <button className="btn-link" onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>
         {mode === 'signin' ? 'はじめての方は新規登録' : 'アカウントをお持ちの方はログイン'}
       </button>
+      <a href="/about" className="btn-link small" style={{ alignSelf: 'center' }}>
+        シフト手帳について
+      </a>
     </div>
   );
 }

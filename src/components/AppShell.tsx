@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { useApp } from './AppProvider';
 import { Icon, type IconName } from './Icon';
+import { PUBLIC_PATHS } from '@/lib/site';
 
 const NAV: { href: string; label: string; icon: IconName }[] = [
   { href: '/', label: 'ホーム', icon: 'home' },
@@ -33,11 +34,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const onLogin = path === '/login';
+  const isPublic = PUBLIC_PATHS.includes(path);
 
   useEffect(() => {
+    if (isPublic) return;
     if (status === 'signedOut' && !onLogin) router.replace(`/login?next=${encodeURIComponent(path)}`);
     if (status === 'ready' && onLogin) router.replace(nextPath());
-  }, [status, onLogin, router, path]);
+  }, [status, onLogin, isPublic, router, path]);
+
+  // 紹介ページなどは、ログインしていなくてもそのまま表示する（広告会社の審査・初めての人向け）
+  if (isPublic) return <>{children}</>;
 
   // ログイン後の準備で失敗した場合は、ログイン画面でもエラーを表示する（何も起きないように見えるのを防ぐ）
   if (status === 'error') {
