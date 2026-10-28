@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useApp, useStore } from '@/components/AppProvider';
 import { PushSection } from '@/components/PushSection';
+import { callApi } from '@/lib/api';
 import { useAllData, useNow } from '@/lib/hooks';
 import { buildMorningNotifications, nextMorning } from '@/lib/notifications';
 import { formatDateJa, isMyShift, isMyTask } from '@/lib/schedule';
@@ -42,6 +43,12 @@ export default function SettingsPage() {
   const [saveState, setSaveState] = useState<'' | 'saving' | 'saved' | 'error'>('');
   const [env, setEnv] = useState<{ platform: Platform; standalone: boolean } | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (store.mode !== 'firebase') return;
+    callApi<{ admin: boolean }>('/api/admin/me', { method: 'GET' }).then((r) => setIsAdmin(r.admin), () => {});
+  }, [store.mode]);
 
   useEffect(() => {
     setEnv({ platform: detectPlatform(), standalone: isStandalone() });
@@ -189,6 +196,14 @@ export default function SettingsPage() {
       <section className="card stack">
         <h2>アカウント</h2>
         <div>{userName}</div>
+        {isAdmin && (
+          <Link href="/admin/ads" className="link-card" style={{ marginBottom: 0 }}>
+            <span>
+              <b>運営者メニュー：広告の管理</b>
+            </span>
+            <span aria-hidden="true">›</span>
+          </Link>
+        )}
         {store.mode === 'firebase' && (
           <button className="btn btn-outline" onClick={signOut}>
             ログアウト

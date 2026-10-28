@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { AdSlot } from '@/components/AdSlot';
 import { useApp, useStore } from '@/components/AppProvider';
 import { Icon } from '@/components/Icon';
 import { NextShiftCard } from '@/components/NextShiftCard';
@@ -258,6 +259,8 @@ export default function DashboardPage() {
           </nav>
         </div>
       </div>
+
+      <AdSlot slot="home" />
     </div>
   );
 }
