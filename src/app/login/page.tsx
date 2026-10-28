@@ -42,6 +42,8 @@ const isStandalone = () =>
 async function signInWithGoogle() {
   const { auth } = getFirebase();
   const provider = new GoogleAuthProvider();
+  // 前回のアカウントで自動的にログインせず、毎回アカウントを選べるようにする（複数アカウントを使い分けるため）
+  provider.setCustomParameters({ prompt: 'select_account' });
   // ホーム画面のアプリではポップアップ（別ウィンドウ）が使えないため、画面ごと切り替える方式にする
   if (isStandalone()) return signInWithRedirect(auth, provider);
   try {
