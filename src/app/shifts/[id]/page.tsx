@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { useStore } from '@/components/AppProvider';
+import { useApp, useStore } from '@/components/AppProvider';
 import { ShiftForm, TaskForm } from '@/components/forms';
 import { ShiftStatusBadge } from '@/components/ShiftRow';
 import { useAllData, useNow } from '@/lib/hooks';
@@ -13,6 +13,8 @@ import {
   formatDateJa,
   formatPeriod,
   formatTimeRange,
+  isMyShift,
+  isMyTask,
   nextTaskStatus,
   shiftPhase,
 } from '@/lib/schedule';
@@ -21,6 +23,7 @@ import { SHIFT_STATUS_LABEL, TASK_STATUS_LABEL, type ShiftStatus } from '@/lib/t
 export default function ShiftDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const store = useStore();
+  const { viewer, isManager, workspace } = useApp();
   const now = useNow();
   const data = useAllData();
   const [editing, setEditing] = useState(false);
@@ -43,8 +46,13 @@ export default function ShiftDetailPage({ params }: { params: { id: string } }) 
 
   const event = data.eventMap.get(shift.eventId);
   const phase = shiftPhase(shift, now);
-  const isNext = findNextShift(data.shifts, now)?.id === shift.id;
-  const prepTasks = data.tasks.filter((t) => t.shiftId === shift.id);
+  const isNext = findNextShift(data.shifts.filter((s) => isMyShift(s, viewer)), now)?.id === shift.id;
+  // 準備タスク：スタッフは自分の分、管理者は全員分を見る
+  const prepTasks = data.tasks.filter((t) => t.shiftId === shift.id && (isManager || isMyTask(t, viewer)));
+  const assigneeLabel =
+    shift.staff ||
+    (shift.assigneeUid ? workspace?.memberNames?.[shift.assigneeUid] : '') ||
+    (viewer.personal ? '' : '未定');
 
   const setStatus = (status: ShiftStatus) => store.update('shifts', shift.id, { status });
 
@@ -75,9 +83,11 @@ export default function ShiftDetailPage({ params }: { params: { id: string } }) 
         <Link href="/shifts" className="btn-link">
           ‹ 出勤一覧
         </Link>
-        <button className="btn btn-outline btn-sm" onClick={() => setEditing(true)}>
-          編集
-        </button>
+        {isManager && (
+          <button className="btn btn-outline btn-sm" onClick={() => setEditing(true)}>
+            編集
+          </button>
+        )}
       </div>
 
       <section className="card stack">
@@ -109,8 +119,8 @@ export default function ShiftDetailPage({ params }: { params: { id: string } }) 
             <dd>{event?.startDate ? formatPeriod(event.startDate, event.endDate) : '—'}</dd>
           </div>
           <div>
-            <dt>担当スタッフ</dt>
-            <dd>{shift.staff || '—'}</dd>
+            <dt>担当</dt>
+            <dd>{assigneeLabel || '—'}</dd>
           </div>
           <div>
             <dt>役割</dt>
@@ -126,20 +136,22 @@ export default function ShiftDetailPage({ params }: { params: { id: string } }) 
           </div>
         </dl>
 
-        <div>
-          <div className="small muted" style={{ marginBottom: 6 }}>
-            状態を変更
+        {isManager && (
+          <div>
+            <div className="small muted" style={{ marginBottom: 6 }}>
+              状態を変更
+            </div>
+            <div className="choice">
+              {(Object.entries(SHIFT_STATUS_LABEL) as [ShiftStatus, string][]).map(([s, label]) => (
+                <button key={s} className={shift.status === s ? 'active' : ''} onClick={() => setStatus(s)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="choice">
-            {(Object.entries(SHIFT_STATUS_LABEL) as [ShiftStatus, string][]).map(([s, label]) => (
-              <button key={s} className={shift.status === s ? 'active' : ''} onClick={() => setStatus(s)}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
 
-        {event && (
+        {event && isManager && (
           <Link href={`/events?edit=${event.id}`} className="section-link" style={{ marginTop: 0 }}>
             催事の情報（会場・持ち物など）を編集
           </Link>
@@ -172,14 +184,23 @@ export default function ShiftDetailPage({ params }: { params: { id: string } }) 
           <ul className="task-list">
             {prepTasks.map((t) => (
               <li key={t.id} className={`task-item ${t.status === 'done' ? 'done' : ''}`}>
-                <button
-                  className={`status-btn status-${t.status}`}
-                  onClick={() => store.update('tasks', t.id, { status: nextTaskStatus(t.status) })}
-                >
-                  {TASK_STATUS_LABEL[t.status]}
-                </button>
+                {isManager || isMyTask(t, viewer) ? (
+                  <button
+                    className={`status-btn status-${t.status}`}
+                    onClick={() => store.update('tasks', t.id, { status: nextTaskStatus(t.status) })}
+                  >
+                    {TASK_STATUS_LABEL[t.status]}
+                  </button>
+                ) : (
+                  <span className={`status-pill status-${t.status}`}>{TASK_STATUS_LABEL[t.status]}</span>
+                )}
                 <div className="grow">
-                  <div className="title">{t.title}</div>
+                  <div className="title">
+                    {t.title}
+                    {!viewer.personal && t.assigneeUid && t.assigneeUid !== viewer.uid && (
+                      <span className="staff-name">{workspace?.memberNames?.[t.assigneeUid] || 'メンバー'}</span>
+                    )}
+                  </div>
                   {t.date && (
                     <div className="small muted">
                       {formatDateJa(t.date)} {t.time}
@@ -192,9 +213,11 @@ export default function ShiftDetailPage({ params }: { params: { id: string } }) 
         )}
       </section>
 
-      <button className="btn btn-danger" onClick={remove}>
-        この出勤予定を削除
-      </button>
+      {isManager && (
+        <button className="btn btn-danger" onClick={remove}>
+          この出勤予定を削除
+        </button>
+      )}
     </div>
   );
 }

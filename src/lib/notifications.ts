@@ -2,7 +2,7 @@
 // 設定画面の「届く通知のプレビュー」と、段階3のサーバーからの自動送信で同じものを使う。
 
 import { addDays, daysBetween, formatDateJa, formatTimeRange, sortShifts, type Now } from './schedule.ts';
-import type { Deadline, EventItem, NotificationPrefs, Shift, Task } from './types';
+import type { AvailabilityPeriod, Deadline, EventItem, NotificationPrefs, Shift, Task } from './types';
 
 export interface MorningNotification {
   /** 二重送信を防ぐための識別子（同じ key は二度送らない） */
@@ -20,21 +20,47 @@ const DEADLINE_REMIND_DAYS = [3, 1, 0];
 /**
  * 「today」の朝に送る通知を作る。
  * 出勤は確定のみ・キャンセルは除外（ホーム画面の「次の出勤」と同じ考え方）。
+ * shifts・tasks は、呼び出す側で「その人の分」に絞ってから渡す（isMyShift / isMyTask）。
+ * pendingAvailability には、受付中でその人がまだ提出していないシフト希望の受付だけを渡す。
+ * prefix はチーム名など、通知のタイトルの先頭に付ける文字（例：「【〇〇チーム】」）。
  */
 export function buildMorningNotifications(
   today: string,
-  data: { shifts: Shift[]; tasks: Task[]; deadlines: Deadline[]; eventMap: Map<string, EventItem> },
+  data: {
+    shifts: Shift[];
+    tasks: Task[];
+    deadlines: Deadline[];
+    eventMap: Map<string, EventItem>;
+    pendingAvailability?: AvailabilityPeriod[];
+  },
   prefs: NotificationPrefs,
+  prefix = '',
 ): MorningNotification[] {
   const list: MorningNotification[] = [];
   const venueOf = (s: Shift) => data.eventMap.get(s.eventId)?.venue || '会場未設定';
+  const whenLabel = (left: number) => (left === 0 ? '今日まで' : left === 1 ? '明日まで' : `あと${left}日`);
+
+  if (prefs.deadline) {
+    for (const p of data.pendingAvailability ?? []) {
+      if (p.status !== 'open' || !p.deadlineDate) continue;
+      const left = daysBetween(today, p.deadlineDate);
+      if (!DEADLINE_REMIND_DAYS.includes(left)) continue;
+      list.push({
+        key: `avail:${p.id}:${p.deadlineDate}:${left}`,
+        kind: 'deadline',
+        title: `シフト希望の提出${whenLabel(left)}：${p.title}`,
+        body: `${formatDateJa(p.deadlineDate)}${p.deadlineTime ? ` ${p.deadlineTime}` : ''}まで。アプリから出られる日を提出してください`,
+        url: `/availability/${p.id}`,
+      });
+    }
+  }
 
   if (prefs.deadline) {
     for (const d of data.deadlines) {
       if (d.done || !d.date) continue;
       const left = daysBetween(today, d.date);
       if (!DEADLINE_REMIND_DAYS.includes(left)) continue;
-      const when = left === 0 ? '今日まで' : left === 1 ? '明日まで' : `あと${left}日`;
+      const when = whenLabel(left);
       list.push({
         key: `deadline:${d.id}:${d.date}:${left}`,
         kind: 'deadline',
@@ -87,7 +113,7 @@ export function buildMorningNotifications(
     }
   }
 
-  return list;
+  return prefix ? list.map((n) => ({ ...n, title: `${prefix}${n.title}` })) : list;
 }
 
 /**

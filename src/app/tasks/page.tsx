@@ -1,22 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useStore } from '@/components/AppProvider';
+import { useApp, useStore } from '@/components/AppProvider';
 import { DeadlineForm, TaskForm } from '@/components/forms';
 import { Icon } from '@/components/Icon';
 import { useAllData, useNow } from '@/lib/hooks';
-import { addDays, daysBetween, formatDateJa, nextTaskStatus, upcomingShifts } from '@/lib/schedule';
+import { addDays, daysBetween, formatDateJa, isMyTask, nextTaskStatus, upcomingShifts } from '@/lib/schedule';
 import { TASK_STATUS_LABEL, type Deadline, type Task } from '@/lib/types';
 
 type Tab = 'tasks' | 'deadlines';
 
 export default function TasksPage() {
   const store = useStore();
+  const { viewer, isManager, workspace } = useApp();
   const now = useNow();
   const data = useAllData();
   const [tab, setTab] = useState<Tab>('tasks');
   // null: 閉じている / 'new': 新規 / それ以外: 編集中のID
   const [editing, setEditing] = useState<string | null>(null);
+  // チームの管理者は、全員のタスクも見られる
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('tab') === 'deadlines') setTab('deadlines');
@@ -43,16 +46,22 @@ export default function TasksPage() {
     if (confirm(`「${d.title}」を削除しますか？`)) await store.remove('deadlines', d.id);
   };
 
+  const isTeam = !viewer.personal;
+  const canChange = (t: Task) => isManager || isMyTask(t, viewer);
+  const assigneeName = (t: Task) =>
+    isTeam && t.assigneeUid && t.assigneeUid !== viewer.uid ? workspace?.memberNames?.[t.assigneeUid] || 'メンバー' : '';
+
   // ---- タスク：期限切れ / 今日 / 明日以降 / 日付なし / 完了 に分ける
+  const tasks = isTeam && isManager && showAll ? data.tasks : data.tasks.filter((t) => isMyTask(t, viewer));
   const tomorrow = addDays(now.date, 1);
   const byWhen = (a: Task, b: Task) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`);
-  const open = data.tasks.filter((t) => t.status !== 'done').sort(byWhen);
+  const open = tasks.filter((t) => t.status !== 'done').sort(byWhen);
   const groups: [string, Task[], boolean?][] = [
     ['期限切れ', open.filter((t) => t.date && t.date < now.date), true],
     ['今日', open.filter((t) => t.date === now.date)],
     ['明日以降', open.filter((t) => t.date && t.date >= tomorrow)],
     ['日付なし', open.filter((t) => !t.date)],
-    ['完了', data.tasks.filter((t) => t.status === 'done').sort(byWhen).reverse()],
+    ['完了', tasks.filter((t) => t.status === 'done').sort(byWhen).reverse()],
   ];
 
   const editingTask = editing && editing !== 'new' ? data.tasks.find((t) => t.id === editing) : undefined;
@@ -62,7 +71,7 @@ export default function TasksPage() {
     <div>
       <div className="page-head">
         <h1>タスク・期限</h1>
-        {!editing && (
+        {!editing && (tab === 'tasks' || isManager) && (
           <button className="btn btn-primary btn-sm" onClick={() => setEditing('new')}>
             <Icon name="plus" size={18} />
             追加
@@ -78,6 +87,17 @@ export default function TasksPage() {
           提出期限
         </button>
       </div>
+
+      {tab === 'tasks' && isTeam && isManager && (
+        <div className="tabs">
+          <button className={!showAll ? 'active' : ''} onClick={() => setShowAll(false)}>
+            自分のタスク
+          </button>
+          <button className={showAll ? 'active' : ''} onClick={() => setShowAll(true)}>
+            チーム全員
+          </button>
+        </div>
+      )}
 
       {editing && (
         <div className="card" style={{ marginBottom: 16 }}>
@@ -109,7 +129,7 @@ export default function TasksPage() {
       )}
 
       {tab === 'tasks' ? (
-        data.tasks.length === 0 ? (
+        tasks.length === 0 ? (
           <p className="empty-msg">タスクはまだありません</p>
         ) : (
           <div className="stack">
@@ -122,26 +142,35 @@ export default function TasksPage() {
                   <ul className="task-list">
                     {list.map((t) => (
                       <li key={t.id} className={`task-item ${t.status === 'done' ? 'done' : ''}`}>
-                        <button
-                          className={`status-btn status-${t.status}`}
-                          onClick={() => store.update('tasks', t.id, { status: nextTaskStatus(t.status) })}
-                        >
-                          {TASK_STATUS_LABEL[t.status]}
-                        </button>
+                        {canChange(t) ? (
+                          <button
+                            className={`status-btn status-${t.status}`}
+                            onClick={() => store.update('tasks', t.id, { status: nextTaskStatus(t.status) })}
+                          >
+                            {TASK_STATUS_LABEL[t.status]}
+                          </button>
+                        ) : (
+                          <span className={`status-pill status-${t.status}`}>{TASK_STATUS_LABEL[t.status]}</span>
+                        )}
                         <div className="grow">
-                          <div className="title">{t.title}</div>
+                          <div className="title">
+                            {t.title}
+                            {assigneeName(t) && <span className="staff-name">{assigneeName(t)}</span>}
+                          </div>
                           <div className="small muted">
                             {[t.date && `${formatDateJa(t.date)} ${t.time}`.trim(), shiftLabel(t)].filter(Boolean).join(' ・ ')}
                           </div>
                         </div>
-                        <div className="form-actions" style={{ flexDirection: 'column' }}>
-                          <button className="btn-link small" onClick={() => setEditing(t.id)}>
-                            編集
-                          </button>
-                          <button className="btn-link small" style={{ color: 'var(--danger)' }} onClick={() => removeTask(t)}>
-                            削除
-                          </button>
-                        </div>
+                        {canChange(t) && (
+                          <div className="form-actions" style={{ flexDirection: 'column' }}>
+                            <button className="btn-link small" onClick={() => setEditing(t.id)}>
+                              編集
+                            </button>
+                            <button className="btn-link small" style={{ color: 'var(--danger)' }} onClick={() => removeTask(t)}>
+                              削除
+                            </button>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -160,12 +189,16 @@ export default function TasksPage() {
               const left = daysBetween(now.date, d.date);
               return (
                 <li key={d.id} className={`task-item ${d.done ? 'done' : ''}`}>
-                  <button
-                    className={`status-btn ${d.done ? 'status-done' : 'status-todo'}`}
-                    onClick={() => store.update('deadlines', d.id, { done: !d.done })}
-                  >
-                    {d.done ? '提出済み' : '未提出'}
-                  </button>
+                  {isManager ? (
+                    <button
+                      className={`status-btn ${d.done ? 'status-done' : 'status-todo'}`}
+                      onClick={() => store.update('deadlines', d.id, { done: !d.done })}
+                    >
+                      {d.done ? '提出済み' : '未提出'}
+                    </button>
+                  ) : (
+                    <span className={`status-pill ${d.done ? 'status-done' : 'status-todo'}`}>{d.done ? '締切済み' : '期限'}</span>
+                  )}
                   <div className="grow">
                     <div className="title">{d.title}</div>
                     <div className="small muted">
@@ -178,14 +211,16 @@ export default function TasksPage() {
                     </div>
                     {d.notes && <div className="small muted">{d.notes}</div>}
                   </div>
-                  <div className="form-actions" style={{ flexDirection: 'column' }}>
-                    <button className="btn-link small" onClick={() => setEditing(d.id)}>
-                      編集
-                    </button>
-                    <button className="btn-link small" style={{ color: 'var(--danger)' }} onClick={() => removeDeadline(d)}>
-                      削除
-                    </button>
-                  </div>
+                  {isManager && (
+                    <div className="form-actions" style={{ flexDirection: 'column' }}>
+                      <button className="btn-link small" onClick={() => setEditing(d.id)}>
+                        編集
+                      </button>
+                      <button className="btn-link small" style={{ color: 'var(--danger)' }} onClick={() => removeDeadline(d)}>
+                        削除
+                      </button>
+                    </div>
+                  )}
                 </li>
               );
             })}

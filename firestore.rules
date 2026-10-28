@@ -1,8 +1,14 @@
 rules_version = '2';
 
-// データの保護ルール。ログインした本人（作業スペースのメンバー）以外は読み書きできない。
+// データの保護ルール。作業スペース（個人用・チーム）のメンバー以外は読み書きできない。
+// 役割：owner（オーナー）／admin（管理者）／staff（スタッフ）
+//   - 催事・出勤・提出期限・シフト希望の受付：全員が見られる。登録・編集はオーナーと管理者だけ
+//   - タスク：全員が見られる。スタッフは自分が担当のタスクだけ作成・変更できる
+//   - シフト希望の回答：本人と管理者だけが見られる。本人が、受付中の間だけ提出・修正できる
+//   - メンバーの追加・役割の変更・チームの作成・招待は、サーバー（管理者権限）だけが行う
 // 反映するには：Firebaseコンソール → Firestore → ルール に貼り付けて「公開」
 //               または  firebase deploy --only firestore:rules
+// 変更したら npm run test:rules で確かめる。
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -10,33 +16,87 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function wsPath(wid) {
+      return /databases/$(database)/documents/workspaces/$(wid);
+    }
+
     function isMember(wid) {
-      return signedIn()
-        && request.auth.uid in get(/databases/$(database)/documents/workspaces/$(wid)).data.members;
+      return signedIn() && exists(wsPath(wid)) && request.auth.uid in get(wsPath(wid)).data.members;
+    }
+
+    function isManager(wid) {
+      return isMember(wid) && get(wsPath(wid)).data.members[request.auth.uid] in ['owner', 'admin'];
     }
 
     match /workspaces/{wid} {
       // 自分専用スペース（ID = 自分のユーザーID）は、まだ存在しなくても確認できるようにする
-      allow read: if signedIn() && (wid == request.auth.uid || isMember(wid));
+      allow get: if signedIn() && (wid == request.auth.uid || isMember(wid));
+      // 「自分が入っているスペースの一覧」の読み込み
+      allow list: if signedIn() && request.auth.uid in resource.data.memberUids;
 
-      // 作れるのは自分専用スペースだけ。メンバーは自分のみ、プランは free から始まる
+      // 画面から作れるのは自分専用スペースだけ。メンバーは自分のみ、プランは free から始まる
+      // （チームの作成はサーバーで行う）
       allow create: if signedIn()
         && wid == request.auth.uid
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.members.keys().hasOnly([request.auth.uid])
-        && request.resource.data.plan == 'free';
+        && request.resource.data.members[request.auth.uid] == 'owner'
+        && request.resource.data.plan == 'free'
+        && request.resource.data.get('type', 'personal') == 'personal'
+        && request.resource.data.get('memberUids', [request.auth.uid]) == [request.auth.uid];
 
-      // メンバー・プランの変更は将来の管理画面／課金処理（サーバー側）で行うため、アプリからは不可
-      allow update, delete: if false;
+      // 名前の変更だけは、オーナーと管理者が画面から行える。メンバー・プランはサーバーのみ
+      allow update: if isManager(wid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
+      allow delete: if false;
 
-      match /{col}/{docId} {
-        allow read, write: if isMember(wid)
-          && col in ['events', 'shifts', 'tasks', 'deadlines'];
+      match /events/{id} {
+        allow read: if isMember(wid);
+        allow write: if isManager(wid);
       }
+
+      match /shifts/{id} {
+        allow read: if isMember(wid);
+        allow write: if isManager(wid);
+      }
+
+      match /deadlines/{id} {
+        allow read: if isMember(wid);
+        allow write: if isManager(wid);
+      }
+
+      match /tasks/{id} {
+        allow read: if isMember(wid);
+        allow create: if isMember(wid)
+          && (isManager(wid) || request.resource.data.assigneeUid == request.auth.uid);
+        allow update: if isMember(wid)
+          && (isManager(wid)
+            || (resource.data.assigneeUid == request.auth.uid
+              && request.resource.data.assigneeUid == request.auth.uid));
+        allow delete: if isMember(wid)
+          && (isManager(wid) || resource.data.assigneeUid == request.auth.uid);
+      }
+
+      // シフト希望の受付（期間・締め切り）
+      match /availabilityPeriods/{id} {
+        allow read: if isMember(wid);
+        allow write: if isManager(wid);
+      }
+
+      // シフト希望の回答。ID は「受付ID_ユーザーID」に固定し、本人の分しか作れないようにする
+      match /availability/{id} {
+        allow read: if isManager(wid) || (isMember(wid) && resource.data.uid == request.auth.uid);
+        allow create, update: if isMember(wid)
+          && request.resource.data.uid == request.auth.uid
+          && id == request.resource.data.periodId + '_' + request.auth.uid
+          && get(/databases/$(database)/documents/workspaces/$(wid)/availabilityPeriods/$(request.resource.data.periodId)).data.status == 'open';
+        allow delete: if isManager(wid);
+      }
+
+      // notificationLog（通知の送信記録）はサーバーだけが使うので、ここでは許可しない
     }
 
     // ユーザーごとの設定（通知のオン・オフなど）と、プッシュ通知を受け取る端末の登録。本人だけが読み書きできる。
-    // 通知の送信記録はサーバー（管理者権限）だけが書くので、ここでは許可しない。
     match /users/{uid} {
       allow read, write: if signedIn() && request.auth.uid == uid;
 
@@ -45,7 +105,7 @@ service cloud.firestore {
       }
     }
 
-    // 上記以外はすべて拒否
+    // invites（招待）を含め、上記以外はすべて拒否（サーバーのみが扱う）
     match /{document=**} {
       allow read, write: if false;
     }

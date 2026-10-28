@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import {
   addDays,
   countdownLabel,
+  datesInRange,
   daysBetween,
+  isMyShift,
+  isMyTask,
   findNextShift,
   formatDateJa,
   shiftPhase,
@@ -69,6 +72,25 @@ test('今日の予定は時刻順、時間指定なしは最後', () => {
   ];
   const items = todayAgenda(now, [shift({ id: 's1' })], tasks, [], new Map());
   assert.deepEqual(items.map((i) => i.key), ['task-t2', 'shift-s1', 'task-t1']);
+});
+
+test('自分の出勤・タスクの判定（個人用は全部、チームは担当分だけ）', () => {
+  const me = { uid: 'me', personal: false };
+  assert.equal(isMyShift(shift({ assigneeUid: 'me' }), me), true);
+  assert.equal(isMyShift(shift({ assigneeUid: 'other' }), me), false);
+  assert.equal(isMyShift(shift({ assigneeUid: '' }), me), false); // 名前だけの人の出勤
+  assert.equal(isMyShift(shift({}), { uid: 'me', personal: true }), true);
+  const task = (assigneeUid?: string) =>
+    ({ id: 't', title: '', date: '', time: '', status: 'todo', shiftId: '', notes: '', createdAt: 0, updatedAt: 0, assigneeUid }) as Task;
+  assert.equal(isMyTask(task('me'), me), true);
+  assert.equal(isMyTask(task('other'), me), false);
+  assert.equal(isMyTask(task(undefined), me), true); // 担当なし＝全員のタスク
+});
+
+test('期間の日付一覧', () => {
+  assert.deepEqual(datesInRange('2026-12-30', '2027-01-02'), ['2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02']);
+  assert.equal(datesInRange('2026-01-01', '2026-12-31').length, 62);
+  assert.deepEqual(datesInRange('2026-12-02', '2026-12-01'), []);
 });
 
 test('期限が近い項目', () => {

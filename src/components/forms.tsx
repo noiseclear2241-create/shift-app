@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { useStore } from './AppProvider';
+import { useApp, useStore } from './AppProvider';
 import { formatDateJa, formatTimeRange } from '@/lib/schedule';
 import {
   SHIFT_STATUS_LABEL,
@@ -92,6 +92,7 @@ export function ShiftForm({
   onCancel?: () => void;
 }) {
   const store = useStore();
+  const { workspace } = useApp();
   const { busy, error, run } = useSubmit();
   const [f, setF] = useState({
     eventId: initial?.eventId ?? (events.length === 1 ? events[0].id : ''),
@@ -99,11 +100,27 @@ export function ShiftForm({
     startTime: initial?.startTime ?? '',
     endTime: initial?.endTime ?? '',
     staff: initial?.staff ?? '',
+    assigneeUid: initial?.assigneeUid ?? '',
     role: initial?.role ?? '',
     status: initial?.status ?? ('tentative' as ShiftStatus),
     notes: initial?.notes ?? '',
   });
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+
+  // チームでは、担当をメンバーから選ぶ（アプリを使わない人は「名前だけ入力」）
+  const isTeam = workspace?.type === 'team';
+  const memberOptions = isTeam
+    ? Object.keys(workspace.members ?? {})
+        .map((uid) => ({ uid, name: workspace.memberNames?.[uid] || 'メンバー' }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'ja'))
+    : [];
+  const NAME_ONLY = '__name__';
+  const [assigneeChoice, setAssigneeChoice] = useState(f.assigneeUid || (f.staff ? NAME_ONLY : ''));
+  const chooseAssignee = (value: string) => {
+    setAssigneeChoice(value);
+    if (value === NAME_ONLY || value === '') setF({ ...f, assigneeUid: '', staff: value === '' ? '' : f.staff });
+    else setF({ ...f, assigneeUid: value, staff: memberOptions.find((m) => m.uid === value)?.name ?? '' });
+  };
 
   if (events.length === 0) {
     return (
@@ -156,14 +173,40 @@ export function ShiftForm({
           <input type="time" value={f.endTime} onChange={set('endTime')} />
         </Field>
       </div>
-      <div className="row">
-        <Field label="担当スタッフ">
-          <input value={f.staff} onChange={set('staff')} placeholder="例：山田" />
-        </Field>
-        <Field label="役割">
-          <input value={f.role} onChange={set('role')} placeholder="例：レジ・販売" />
-        </Field>
-      </div>
+      {isTeam ? (
+        <>
+          <Field label="担当" hint="メンバーを選ぶと、その人の「次の出勤」と通知に表示されます">
+            <select value={assigneeChoice} onChange={(e) => chooseAssignee(e.target.value)}>
+              <option value="">未定</option>
+              {memberOptions.map((m) => (
+                <option key={m.uid} value={m.uid}>
+                  {m.name}
+                </option>
+              ))}
+              <option value={NAME_ONLY}>名前だけ入力（アプリを使わない人）</option>
+            </select>
+          </Field>
+          <div className="row">
+            {assigneeChoice === NAME_ONLY && (
+              <Field label="担当者の名前">
+                <input value={f.staff} onChange={set('staff')} placeholder="例：山田" required />
+              </Field>
+            )}
+            <Field label="役割">
+              <input value={f.role} onChange={set('role')} placeholder="例：レジ・販売" />
+            </Field>
+          </div>
+        </>
+      ) : (
+        <div className="row">
+          <Field label="担当スタッフ">
+            <input value={f.staff} onChange={set('staff')} placeholder="例：山田" />
+          </Field>
+          <Field label="役割">
+            <input value={f.role} onChange={set('role')} placeholder="例：レジ・販売" />
+          </Field>
+        </div>
+      )}
       <Field label="状態" hint="「確定」にした出勤だけがホームの「次の出勤」に表示されます">
         <Choice
           value={f.status}
@@ -252,14 +295,18 @@ export function TaskForm({
   onCancel?: () => void;
 }) {
   const store = useStore();
+  const { workspace, uid, isManager } = useApp();
   const { busy, error, run } = useSubmit();
   const [f, setF] = useState({
     title: initial?.title ?? '',
     date: initial?.date ?? '',
     time: initial?.time ?? '',
     shiftId: initial?.shiftId ?? fixedShiftId ?? '',
+    // 新しいタスクの担当は自分。チームの管理者は、ほかのメンバーを担当にできる
+    assigneeUid: initial?.assigneeUid ?? uid,
     notes: initial?.notes ?? '',
   });
+  const canAssign = workspace?.type === 'team' && isManager;
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
 
   const submit = (e: FormEvent) => {
@@ -284,6 +331,18 @@ export function TaskForm({
           <input type="time" value={f.time} onChange={set('time')} />
         </Field>
       </div>
+      {canAssign && (
+        <Field label="担当">
+          <select value={f.assigneeUid} onChange={set('assigneeUid')}>
+            {Object.keys(workspace.members ?? {}).map((m) => (
+              <option key={m} value={m}>
+                {workspace.memberNames?.[m] || 'メンバー'}
+                {m === uid ? '（自分）' : ''}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
       {!fixedShiftId && (
         <Field label="関連する出勤（準備タスクの場合）">
           <select value={f.shiftId} onChange={set('shiftId')}>

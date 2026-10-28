@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useStore } from '@/components/AppProvider';
+import { useApp, useStore } from '@/components/AppProvider';
 import { EventForm } from '@/components/forms';
 import { Icon } from '@/components/Icon';
 import { useAllData, useNow } from '@/lib/hooks';
@@ -10,6 +10,7 @@ import type { EventItem } from '@/lib/types';
 
 export default function EventsPage() {
   const store = useStore();
+  const { isManager } = useApp();
   const now = useNow();
   const data = useAllData();
   // null: 一覧表示 / 'new': 新規 / それ以外: 編集中の催事ID
@@ -30,7 +31,7 @@ export default function EventsPage() {
   };
 
   const target = editing && editing !== 'new' ? data.events.find((e) => e.id === editing) : undefined;
-  if (editing) {
+  if (editing && isManager) {
     return (
       <div>
         <div className="page-head">
@@ -67,15 +68,19 @@ export default function EventsPage() {
               {[ev.name, ev.facility, formatPeriod(ev.startDate, ev.endDate)].filter(Boolean).join(' ・ ')}
             </div>
             <div className="small muted">出勤 {shiftCount(ev.id)}件</div>
+            {!isManager && ev.belongings && <div className="small">持ち物：{ev.belongings}</div>}
+            {!isManager && ev.notes && <div className="small">連絡事項：{ev.notes}</div>}
           </div>
-          <div className="form-actions" style={{ flexDirection: 'column' }}>
-            <button className="btn btn-outline btn-sm" onClick={() => setEditing(ev.id)}>
-              編集
-            </button>
-            <button className="btn-link small" style={{ color: 'var(--danger)' }} onClick={() => remove(ev)}>
-              削除
-            </button>
-          </div>
+          {isManager && (
+            <div className="form-actions" style={{ flexDirection: 'column' }}>
+              <button className="btn btn-outline btn-sm" onClick={() => setEditing(ev.id)}>
+                編集
+              </button>
+              <button className="btn-link small" style={{ color: 'var(--danger)' }} onClick={() => remove(ev)}>
+                削除
+              </button>
+            </div>
+          )}
         </li>
       ))}
     </ul>
@@ -85,13 +90,17 @@ export default function EventsPage() {
     <div className="stack">
       <div className="page-head" style={{ marginBottom: 0 }}>
         <h1>催事・会場</h1>
-        <button className="btn btn-primary btn-sm" onClick={() => setEditing('new')}>
-          <Icon name="plus" size={18} />
-          登録
-        </button>
+        {isManager && (
+          <button className="btn btn-primary btn-sm" onClick={() => setEditing('new')}>
+            <Icon name="plus" size={18} />
+            登録
+          </button>
+        )}
       </div>
       <p className="small muted" style={{ margin: 0 }}>
-        会場・開催期間・持ち物などをここで登録すると、各出勤予定に表示されます。
+        {isManager
+          ? '会場・開催期間・持ち物などをここで登録すると、各出勤予定に表示されます。'
+          : 'チームの催事の一覧です。登録・編集はオーナーと管理者が行います。'}
       </p>
 
       {data.events.length === 0 ? (

@@ -19,6 +19,7 @@ export function NextShiftCard({
   tentativeCount,
   now,
   onToggleTask,
+  canEdit,
 }: {
   shift: Shift | null;
   event?: EventItem;
@@ -26,6 +27,8 @@ export function NextShiftCard({
   tentativeCount: number;
   now: Now;
   onToggleTask: (t: Task) => void;
+  /** 出勤を登録できる人（個人用、またはチームのオーナー・管理者） */
+  canEdit: boolean;
 }) {
   if (!shift) {
     return (
@@ -35,10 +38,12 @@ export function NextShiftCard({
         {tentativeCount > 0 && (
           <p className="small muted">未確定の出勤予定が {tentativeCount} 件あります（確定するとここに表示されます）</p>
         )}
-        <Link href="/shifts/new" className="btn btn-outline">
-          <Icon name="plus" size={18} />
-          出勤予定を登録
-        </Link>
+        {canEdit && (
+          <Link href="/shifts/new" className="btn btn-outline">
+            <Icon name="plus" size={18} />
+            出勤予定を登録
+          </Link>
+        )}
       </section>
     );
   }

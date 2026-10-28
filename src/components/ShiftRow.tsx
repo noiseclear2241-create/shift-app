@@ -12,11 +12,14 @@ export function ShiftRow({
   event,
   highlight,
   extra,
+  showStaff,
 }: {
   shift: Shift;
   event?: EventItem;
   highlight?: string;
   extra?: string;
+  /** チームの全員分を表示するときは、担当者の名前を出す */
+  showStaff?: boolean;
 }) {
   const d = parseYmd(shift.date);
   const venue = event?.venue || '会場未設定';
@@ -34,7 +37,10 @@ export function ShiftRow({
         <span className="dow">{WEEKDAYS[dow]}</span>
       </div>
       <div className="shift-body">
-        <div className="shift-venue">{venue}</div>
+        <div className="shift-venue">
+          {venue}
+          {showStaff && <span className="staff-name">{shift.staff || '担当未定'}</span>}
+        </div>
         <div className="small muted">
           {[formatTimeRange(shift.startTime, shift.endTime), event?.name, shift.role].filter(Boolean).join(' ・ ')}
         </div>

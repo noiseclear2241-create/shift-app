@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useApp } from '@/components/AppProvider';
 import { Icon } from '@/components/Icon';
 import { ShiftRow } from '@/components/ShiftRow';
 import { useAllData, useNow } from '@/lib/hooks';
-import { formatDateJa, parseYmd, sortShifts, venueColor, WEEKDAYS, ymd } from '@/lib/schedule';
+import { formatDateJa, isMyShift, isMyTask, parseYmd, sortShifts, venueColor, WEEKDAYS, ymd } from '@/lib/schedule';
 import { TASK_STATUS_LABEL } from '@/lib/types';
 
 /** その月のカレンダーに並べる日付（前後の月の日も含めて日曜始まりで6週以内） */
@@ -20,8 +21,10 @@ function monthDays(year: number, month: number): string[] {
 export default function CalendarPage() {
   const now = useNow();
   const data = useAllData();
+  const { viewer, isManager } = useApp();
   const [cursor, setCursor] = useState<{ y: number; m: number } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   if (!now || data.loading) return <p className="muted">読み込み中…</p>;
   if (data.error) return <p className="error">データを読み込めませんでした：{data.error}</p>;
@@ -35,8 +38,12 @@ export default function CalendarPage() {
     setCursor({ y: d.getFullYear(), m: d.getMonth() });
   };
 
-  const shiftsOn = (date: string) => sortShifts(data.shifts.filter((s) => s.date === date));
-  const tasksOn = (date: string) => data.tasks.filter((t) => t.date === date);
+  // チームでは、自分の出勤だけ／チーム全員の出勤を切り替える（タスクは常に自分の分）
+  const isTeam = !viewer.personal;
+  const visibleShifts = isTeam && showAll ? data.shifts : data.shifts.filter((s) => isMyShift(s, viewer));
+  const myTasks = data.tasks.filter((t) => isMyTask(t, viewer));
+  const shiftsOn = (date: string) => sortShifts(visibleShifts.filter((s) => s.date === date));
+  const tasksOn = (date: string) => myTasks.filter((t) => t.date === date);
   const deadlinesOn = (date: string) => data.deadlines.filter((d) => d.date === date);
 
   const selShifts = shiftsOn(sel);
@@ -68,6 +75,17 @@ export default function CalendarPage() {
             </button>
           </div>
         </div>
+
+        {isTeam && (
+          <div className="tabs">
+            <button className={!showAll ? 'active' : ''} onClick={() => setShowAll(false)}>
+              自分の出勤
+            </button>
+            <button className={showAll ? 'active' : ''} onClick={() => setShowAll(true)}>
+              チーム全員
+            </button>
+          </div>
+        )}
 
         <div className="cal-grid">
           {WEEKDAYS.map((w, i) => (
@@ -128,10 +146,12 @@ export default function CalendarPage() {
       <section className="card">
         <div className="section-head">
           <h2>{formatDateJa(sel)}</h2>
-          <Link href={`/shifts/new?date=${sel}`} className="btn btn-outline btn-sm">
-            <Icon name="plus" size={16} />
-            出勤を登録
-          </Link>
+          {isManager && (
+            <Link href={`/shifts/new?date=${sel}`} className="btn btn-outline btn-sm">
+              <Icon name="plus" size={16} />
+              出勤を登録
+            </Link>
+          )}
         </div>
 
         {selShifts.length + selTasks.length + selDeadlines.length === 0 ? (
@@ -141,7 +161,7 @@ export default function CalendarPage() {
             {selShifts.length > 0 && (
               <div className="shift-list">
                 {selShifts.map((s) => (
-                  <ShiftRow key={s.id} shift={s} event={data.eventMap.get(s.eventId)} />
+                  <ShiftRow key={s.id} shift={s} event={data.eventMap.get(s.eventId)} showStaff={isTeam && showAll} />
                 ))}
               </div>
             )}

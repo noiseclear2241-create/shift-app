@@ -1,6 +1,9 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
+import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
+
+/** 開発用：パソコン上のテスト用データベース（エミュレーター）につなぐ。本番では使わない */
+const useEmulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === '1';
 
 // NEXT_PUBLIC_ の値はビルド時に埋め込まれる。Firebase のWeb用設定値は公開前提の値で、
 // データの保護は Firestore のセキュリティルール（firestore.rules）で行う。
@@ -22,6 +25,10 @@ export function getFirebase() {
   if (!cached) {
     const app = getApps().length ? getApp() : initializeApp(config);
     cached = { app, auth: getAuth(app), db: getFirestore(app) };
+    if (useEmulator) {
+      connectAuthEmulator(cached.auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+      connectFirestoreEmulator(cached.db, '127.0.0.1', 8080);
+    }
   }
   return cached;
 }

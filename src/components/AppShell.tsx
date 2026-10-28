@@ -16,16 +16,28 @@ const NAV: { href: string; label: string; icon: IconName }[] = [
 
 const isActive = (path: string, href: string) => (href === '/' ? path === '/' : path.startsWith(href));
 
+/** ログイン後に戻る画面（招待リンクから来た場合など）。アプリ内の画面だけ許可する */
+function nextPath() {
+  const next = new URLSearchParams(window.location.search).get('next') ?? '';
+  return next.startsWith('/') && !next.startsWith('//') ? next : '/';
+}
+
+/** 画面上部・サイドバーに出す、今見ている作業スペースの名前 */
+export function workspaceLabel(w: { type: string; name: string } | null) {
+  if (!w) return '';
+  return w.type === 'team' ? w.name : '個人用';
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
-  const { status, error, userName, store, signOut } = useApp();
+  const { status, error, userName, store, signOut, workspace } = useApp();
   const path = usePathname();
   const router = useRouter();
   const onLogin = path === '/login';
 
   useEffect(() => {
-    if (status === 'signedOut' && !onLogin) router.replace('/login');
-    if (status === 'ready' && onLogin) router.replace('/');
-  }, [status, onLogin, router]);
+    if (status === 'signedOut' && !onLogin) router.replace(`/login?next=${encodeURIComponent(path)}`);
+    if (status === 'ready' && onLogin) router.replace(nextPath());
+  }, [status, onLogin, router, path]);
 
   // ログイン後の準備で失敗した場合は、ログイン画面でもエラーを表示する（何も起きないように見えるのを防ぐ）
   if (status === 'error') {
@@ -52,6 +64,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">シフト手帳</div>
+        <Link href="/team" className={`ws-chip ${workspace?.type === 'team' ? 'is-team' : ''}`}>
+          <Icon name="user" size={16} />
+          <span>{workspaceLabel(workspace)}</span>
+          <span className="small">切り替え</span>
+        </Link>
         <nav>
           {NAV.map((n) => (
             <Link key={n.href} href={n.href} className={`side-link ${isActive(path, n.href) ? 'active' : ''}`}>
@@ -73,7 +90,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="content">
         <header className="topbar">
-          <span className="brand">シフト手帳</span>
+          <Link href="/team" className={`ws-chip ${workspace?.type === 'team' ? 'is-team' : ''}`} aria-label="チームの切り替え">
+            <Icon name="user" size={16} />
+            <span>{workspaceLabel(workspace)}</span>
+            <Icon name="chevron" size={14} />
+          </Link>
           <Link href="/settings" className="topbar-link" aria-label="設定">
             <Icon name="gear" />
             設定

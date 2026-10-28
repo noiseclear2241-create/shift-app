@@ -1,16 +1,27 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useStore } from '@/components/AppProvider';
+import { useApp, useStore } from '@/components/AppProvider';
 import { toNow, type Now } from './schedule';
-import type { CollectionName, Deadline, EventItem, Shift, Task } from './types';
+import type { Filter } from './store';
+import type {
+  Availability,
+  AvailabilityPeriod,
+  CollectionName,
+  Deadline,
+  EventItem,
+  Shift,
+  Task,
+} from './types';
 
 /** コレクションをリアルタイムで読み込む（他の端末での変更もすぐ反映される） */
-export function useCollection<T>(name: CollectionName) {
+export function useCollection<T>(name: CollectionName, filter?: Filter) {
   const store = useStore();
   const [items, setItems] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const field = filter?.field;
+  const value = filter?.value;
 
   useEffect(() => {
     setLoading(true);
@@ -25,27 +36,45 @@ export function useCollection<T>(name: CollectionName) {
         setError(e.message);
         setLoading(false);
       },
+      field && value !== undefined ? { field, value } : undefined,
     );
-  }, [store, name]);
+  }, [store, name, field, value]);
 
   return { items, loading, error };
 }
 
-/** 画面で使う4種類のデータをまとめて読み込む */
+/**
+ * 画面で使うデータをまとめて読み込む。
+ * シフト希望の回答は、ルールで本人分しか読めないため、自分の分だけを読む。
+ * pendingAvailability：受付中で、自分がまだ提出していないシフト希望の受付。
+ */
 export function useAllData() {
+  const { uid } = useApp();
   const events = useCollection<EventItem>('events');
   const shifts = useCollection<Shift>('shifts');
   const tasks = useCollection<Task>('tasks');
   const deadlines = useCollection<Deadline>('deadlines');
+  const periods = useCollection<AvailabilityPeriod>('availabilityPeriods');
+  const mine = useCollection<Availability>('availability', { field: 'uid', value: uid });
+
   const eventMap = useMemo(() => new Map(events.items.map((e) => [e.id, e])), [events.items]);
+  const pendingAvailability = useMemo(() => {
+    const submitted = new Set(mine.items.filter((a) => a.submittedAt).map((a) => a.periodId));
+    return periods.items.filter((p) => p.status === 'open' && !submitted.has(p.id));
+  }, [periods.items, mine.items]);
+
+  const all = [events, shifts, tasks, deadlines, periods, mine];
   return {
     events: events.items,
     eventMap,
     shifts: shifts.items,
     tasks: tasks.items,
     deadlines: deadlines.items,
-    loading: events.loading || shifts.loading || tasks.loading || deadlines.loading,
-    error: events.error || shifts.error || tasks.error || deadlines.error,
+    periods: periods.items,
+    myAvailability: mine.items,
+    pendingAvailability,
+    loading: all.some((c) => c.loading),
+    error: all.map((c) => c.error).find(Boolean) ?? '',
   };
 }
 

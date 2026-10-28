@@ -20,6 +20,10 @@ function readServiceAccount() {
 
 export function getAdminApp(): App | null {
   if (getApps().length) return getApps()[0];
+  // 開発用：テスト用データベース（エミュレーター）で動かすときは、秘密鍵なしで使える
+  if (process.env.FIRESTORE_EMULATOR_HOST) {
+    return initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'demo-shift' });
+  }
   const sa = readServiceAccount();
   if (!sa) return null;
   return initializeApp({ credential: cert(sa) });

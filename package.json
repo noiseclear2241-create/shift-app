@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --experimental-strip-types --test src/lib/schedule.test.ts src/lib/notifications.test.ts"
+    "test": "node --experimental-strip-types --test src/lib/schedule.test.ts src/lib/notifications.test.ts",
+    "dev:emulator": "firebase emulators:exec --only auth,firestore --project demo-shift \"next dev -p 3002\"",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-shift \"node --test tests/rules.test.mjs\""
   },
   "dependencies": {
     "firebase": "11.6.0",
@@ -17,9 +19,11 @@
     "react-dom": "18.3.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "4.0.1",
     "@types/node": "20.17.30",
     "@types/react": "18.3.20",
     "@types/react-dom": "18.3.6",
+    "firebase-tools": "14.27.0",
     "typescript": "5.6.3"
   }
 }

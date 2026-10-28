@@ -77,6 +77,20 @@ test('オフにした種類は送らない', () => {
   assert.deepEqual(list.map((n) => n.kind), ['nextShift']);
 });
 
+test('シフト希望：未提出の受付だけ、期限の3日前・前日・当日に知らせる。チーム名を先頭に付ける', () => {
+  const period = (id: string, deadlineDate: string, status: 'open' | 'closed' = 'open') => ({
+    ...base, id, title: `${id}月分`, startDate: '2026-12-01', endDate: '2026-12-31', deadlineDate, deadlineTime: '', status,
+  });
+  const list = buildMorningNotifications(
+    '2026-10-26',
+    { ...data({}), pendingAvailability: [period('12', '2026-10-27'), period('1', '2026-10-28'), period('2', '2026-10-26', 'closed')] },
+    DEFAULT_NOTIFICATION_PREFS,
+    '【A班】',
+  );
+  assert.deepEqual(list.map((n) => n.title), ['【A班】シフト希望の提出明日まで：12月分']);
+  assert.equal(list[0].url, '/availability/12');
+});
+
 test('タイムゾーンごとの今日（定時実行は世界標準時22時＝日本時間7時）', () => {
   const at = new Date('2026-10-26T22:30:00Z');
   assert.equal(todayIn('Asia/Tokyo', at), '2026-10-27');

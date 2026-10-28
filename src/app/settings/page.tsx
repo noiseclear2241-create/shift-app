@@ -6,7 +6,7 @@ import { useApp, useStore } from '@/components/AppProvider';
 import { PushSection } from '@/components/PushSection';
 import { useAllData, useNow } from '@/lib/hooks';
 import { buildMorningNotifications, nextMorning } from '@/lib/notifications';
-import { formatDateJa } from '@/lib/schedule';
+import { formatDateJa, isMyShift, isMyTask } from '@/lib/schedule';
 import { DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from '@/lib/types';
 
 type Platform = 'ios' | 'android' | 'other';
@@ -34,7 +34,7 @@ const PREF_ITEMS: { key: keyof NotificationPrefs; label: string; detail: string 
 ];
 
 export default function SettingsPage() {
-  const { userName, signOut } = useApp();
+  const { userName, signOut, viewer, workspace } = useApp();
   const store = useStore();
   const now = useNow();
   const data = useAllData();
@@ -69,7 +69,17 @@ export default function SettingsPage() {
   if (!now || !prefs || !env || data.loading) return <p className="muted">読み込み中…</p>;
 
   const morning = nextMorning(now);
-  const preview = buildMorningNotifications(morning, data, prefs);
+  // 今見ているスペースについての見本（チームでは自分の担当分だけ。実際の通知は全スペース分が届く）
+  const preview = buildMorningNotifications(
+    morning,
+    {
+      ...data,
+      shifts: data.shifts.filter((s) => isMyShift(s, viewer)),
+      tasks: data.tasks.filter((t) => isMyTask(t, viewer)),
+    },
+    prefs,
+    workspace?.type === 'team' ? `【${workspace.name}】` : '',
+  );
 
   return (
     <div className="stack">

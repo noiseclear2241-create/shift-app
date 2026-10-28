@@ -4,6 +4,26 @@
 
 import type { Deadline, EventItem, Shift, Task, TaskStatus } from './types';
 
+/**
+ * 見ている人の情報。個人用スペースでは全部が「自分の」予定。
+ * チームでは、担当に自分が割り当てられた出勤・タスクだけが「自分の」予定。
+ */
+export interface Viewer {
+  uid: string;
+  personal: boolean;
+}
+
+export const isMyShift = (s: Shift, v: Viewer) => v.personal || s.assigneeUid === v.uid;
+
+export const isMyTask = (t: Task, v: Viewer) => v.personal || !t.assigneeUid || t.assigneeUid === v.uid;
+
+/** start〜end の日付の一覧（両端を含む。最大 maxDays 日） */
+export function datesInRange(start: string, end: string, maxDays = 62): string[] {
+  const list: string[] = [];
+  for (let d = start; d && d <= end && list.length < maxDays; d = addDays(d, 1)) list.push(d);
+  return list;
+}
+
 export const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 const pad = (n: number) => String(n).padStart(2, '0');

@@ -91,6 +91,35 @@ textarea {
   font-weight: 700;
 }
 
+/* 今見ている作業スペース（個人用・チーム）。押すとチーム画面で切り替えられる */
+.ws-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  max-width: 70vw;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.ws-chip span:first-of-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-chip.is-team {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.sidebar .ws-chip {
+  margin: 0 4px;
+  justify-content: space-between;
+}
+
 .topbar-link {
   display: inline-flex;
   align-items: center;
@@ -831,6 +860,16 @@ textarea {
   font-weight: 700;
   word-break: break-word;
 }
+.staff-name {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+}
 .shift-meta {
   flex: none;
   display: flex;
@@ -964,6 +1003,108 @@ textarea {
 }
 .preview-title {
   font-weight: 700;
+}
+
+.link-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 48px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+/* ---------- シフト希望 ---------- */
+
+.avail-list,
+.avail-summary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.avail-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.avail-date {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.avail-date.sun {
+  color: var(--danger);
+}
+.avail-date.sat {
+  color: var(--primary);
+}
+.avail-marks {
+  display: flex;
+  gap: 6px;
+}
+.mark {
+  width: 48px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--muted);
+  cursor: pointer;
+}
+.mark:disabled {
+  cursor: default;
+}
+.mark-ok.active {
+  background: var(--ok-soft);
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.mark-maybe.active {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+.mark-ng.active {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.avail-summary li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.avail-summary-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ---------- チーム画面 ---------- */
+
+.role-select {
+  min-height: 40px;
+  padding: 4px 8px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 16px;
+}
+.invite-url {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 14px;
 }
 
 /* ---------- 詳細画面 ---------- */

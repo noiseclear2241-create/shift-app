@@ -6,7 +6,35 @@ export type ShiftStatus = 'confirmed' | 'tentative' | 'cancelled';
 /** タスクの状態 */
 export type TaskStatus = 'todo' | 'doing' | 'done';
 
-export type CollectionName = 'events' | 'shifts' | 'tasks' | 'deadlines';
+export type CollectionName =
+  | 'events'
+  | 'shifts'
+  | 'tasks'
+  | 'deadlines'
+  | 'availabilityPeriods'
+  | 'availability';
+
+/** 作業スペースでの役割 */
+export type Role = 'owner' | 'admin' | 'staff';
+
+export const ROLE_LABEL: Record<Role, string> = {
+  owner: 'オーナー',
+  admin: '管理者',
+  staff: 'スタッフ',
+};
+
+/** 作業スペース（個人用、またはチーム・企業） */
+export interface Workspace {
+  id: string;
+  name: string;
+  type: 'personal' | 'team';
+  ownerId: string;
+  members: Record<string, Role>;
+  memberUids?: string[];
+  /** メンバーの表示名（ユーザーID → 名前）。サーバーが更新する */
+  memberNames?: Record<string, string>;
+  plan: string;
+}
 
 interface Timestamps {
   createdAt: number;
@@ -32,7 +60,10 @@ export interface Shift extends Timestamps {
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm
   endTime: string; // HH:mm（開始より前なら翌日終了）
+  /** 担当者の名前（アプリを使わない人は名前だけ） */
   staff: string;
+  /** 担当メンバーのユーザーID（チームで、アプリを使う人に割り当てた場合。空なら名前だけ） */
+  assigneeUid?: string;
   role: string;
   status: ShiftStatus;
   notes: string;
@@ -45,7 +76,42 @@ export interface Task extends Timestamps {
   time: string; // HH:mm（空なら時間指定なし）
   status: TaskStatus;
   shiftId: string; // 準備タスクとして紐づく出勤（空なら紐づけなし）
+  /** 担当メンバー（チームの場合）。個人用スペースの古いデータには無い */
+  assigneeUid?: string;
   notes: string;
+}
+
+/** シフト希望の受付（例：「12月分」）。管理者が作る */
+export interface AvailabilityPeriod extends Timestamps {
+  id: string;
+  title: string;
+  startDate: string; // 希望を聞く期間の初日
+  endDate: string; // 希望を聞く期間の最終日
+  deadlineDate: string; // 提出期限
+  deadlineTime: string;
+  status: 'open' | 'closed';
+  notes: string;
+}
+
+/** 1日ごとの希望：○出られる／△相談／×出られない */
+export type AvailabilityMark = 'ok' | 'maybe' | 'ng';
+
+export const AVAILABILITY_LABEL: Record<AvailabilityMark, string> = {
+  ok: '○',
+  maybe: '△',
+  ng: '×',
+};
+
+/** シフト希望の回答。ID は「受付ID_ユーザーID」 */
+export interface Availability {
+  id: string;
+  periodId: string;
+  uid: string;
+  name: string;
+  days: Record<string, AvailabilityMark>;
+  note: string;
+  submittedAt: number;
+  updatedAt: number;
 }
 
 /** シフト提出期限など、締め切りのある項目 */

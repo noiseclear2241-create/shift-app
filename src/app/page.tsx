@@ -1,14 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useStore } from '@/components/AppProvider';
+import { useState } from 'react';
+import { useApp, useStore } from '@/components/AppProvider';
 import { Icon } from '@/components/Icon';
 import { NextShiftCard } from '@/components/NextShiftCard';
 import { ShiftRow } from '@/components/ShiftRow';
 import { useAllData, useNow } from '@/lib/hooks';
 import {
+  daysBetween,
   findNextShift,
   formatDateJa,
+  isMyShift,
+  isMyTask,
   nextAgendaItem,
   nextTaskStatus,
   parseYmd,
@@ -26,19 +30,32 @@ export default function DashboardPage() {
   const now = useNow();
   const data = useAllData();
   const store = useStore();
+  const { viewer, isManager } = useApp();
+  // チームでは「今後の出勤」を自分の分／全員の分で切り替えられる
+  const [showAll, setShowAll] = useState(false);
 
   if (!now || data.loading) return <p className="muted">読み込み中…</p>;
   if (data.error) return <p className="error">データを読み込めませんでした：{data.error}</p>;
 
-  const next = findNextShift(data.shifts, now);
-  const upcoming = upcomingShifts(data.shifts, now);
-  const agenda = todayAgenda(now, data.shifts, data.tasks, data.deadlines, data.eventMap);
+  const isTeam = !viewer.personal;
+  // 「次の出勤」「今日の予定」は、自分が担当の出勤・タスクだけで作る
+  const myShifts = data.shifts.filter((s) => isMyShift(s, viewer));
+  const myTasks = data.tasks.filter((t) => isMyTask(t, viewer));
+
+  const next = findNextShift(myShifts, now);
+  const myUpcoming = upcomingShifts(myShifts, now);
+  const upcoming = isTeam && showAll ? upcomingShifts(data.shifts, now) : myUpcoming;
+  const agenda = todayAgenda(now, myShifts, myTasks, data.deadlines, data.eventMap);
   const nextItem = nextAgendaItem(agenda, now);
-  const urgent = urgentItems(now, data.deadlines, data.tasks);
-  const prepTasks = next ? data.tasks.filter((t) => t.shiftId === next.id) : [];
+  const urgent = urgentItems(now, data.deadlines, myTasks);
+  const prepTasks = next ? myTasks.filter((t) => t.shiftId === next.id) : [];
   const todayTasks = agenda.filter((i) => i.kind === 'task');
   const doneCount = todayTasks.filter((i) => i.status === 'done').length;
-  const todayShifts = data.shifts.filter((s) => s.date === now.date && s.status !== 'cancelled');
+  const todayShifts = myShifts.filter((s) => s.date === now.date && s.status !== 'cancelled');
+  // 受付中で、まだ提出していないシフト希望（期限の近い順）
+  const pendingAvailability = [...data.pendingAvailability].sort((a, b) =>
+    (a.deadlineDate || '9999').localeCompare(b.deadlineDate || '9999'),
+  );
 
   const toggleTask = (t: Pick<Task, 'id' | 'status'>) =>
     store.update('tasks', t.id, { status: nextTaskStatus(t.status) });
@@ -67,13 +84,30 @@ export default function DashboardPage() {
         )}
       </header>
 
-      {urgent.length > 0 && (
+      {(urgent.length > 0 || pendingAvailability.length > 0) && (
         <section className="urgent">
           <div className="urgent-title">
             <Icon name="alert" size={18} />
             期限が近い・過ぎている項目
           </div>
           <ul>
+            {pendingAvailability.map((p) => {
+              const left = p.deadlineDate ? daysBetween(now.date, p.deadlineDate) : null;
+              return (
+                <li key={`avail-${p.id}`} className={left !== null && left < 0 ? 'overdue' : ''}>
+                  <span className="urgent-when">
+                    {left === null ? '受付中' : left < 0 ? '期限切れ' : left === 0 ? '今日まで' : `あと${left}日`}
+                  </span>
+                  <Link href={`/availability/${p.id}`}>シフト希望の提出：{p.title}</Link>
+                  {p.deadlineDate && (
+                    <span className="small muted">
+                      {formatDateJa(p.deadlineDate)}
+                      {p.deadlineTime && ` ${p.deadlineTime}`}まで
+                    </span>
+                  )}
+                </li>
+              );
+            })}
             {urgent.map((u) => (
               <li key={u.key} className={u.overdue ? 'overdue' : ''}>
                 <span className="urgent-when">
@@ -96,9 +130,10 @@ export default function DashboardPage() {
             shift={next}
             event={next ? data.eventMap.get(next.eventId) : undefined}
             prepTasks={prepTasks}
-            tentativeCount={upcoming.filter((s) => s.status === 'tentative').length}
+            tentativeCount={myUpcoming.filter((s) => s.status === 'tentative').length}
             now={now}
             onToggleTask={toggleTask}
+            canEdit={isManager}
           />
 
           <section className="card" id="today">
@@ -138,6 +173,11 @@ export default function DashboardPage() {
                     </div>
                     {item.kind === 'shift' ? (
                       <span className={`status-pill status-${item.status}`}>{SHIFT_PHASE_LABEL[item.status]}</span>
+                    ) : item.kind === 'deadline' && !isManager ? (
+                      // チームの提出期限の「提出済み」は管理者が付ける
+                      <span className={`status-pill status-${item.status}`}>
+                        {item.status === 'done' ? '提出済み' : '未提出'}
+                      </span>
                     ) : (
                       <button
                         className={`status-btn status-${item.status}`}
@@ -164,6 +204,16 @@ export default function DashboardPage() {
               <h2>今後の出勤</h2>
               <span className="small muted">{upcoming.length}件</span>
             </div>
+            {isTeam && (
+              <div className="tabs" style={{ marginBottom: 12 }}>
+                <button className={!showAll ? 'active' : ''} onClick={() => setShowAll(false)}>
+                  自分
+                </button>
+                <button className={showAll ? 'active' : ''} onClick={() => setShowAll(true)}>
+                  チーム全員
+                </button>
+              </div>
+            )}
             {upcoming.length === 0 ? (
               <p className="empty-msg">今後の出勤予定はありません</p>
             ) : (
@@ -174,6 +224,7 @@ export default function DashboardPage() {
                     shift={s}
                     event={data.eventMap.get(s.eventId)}
                     highlight={s.id === next?.id ? '次の出勤' : undefined}
+                    showStaff={isTeam && showAll}
                   />
                 ))}
               </div>
@@ -193,10 +244,17 @@ export default function DashboardPage() {
               <Icon name="check" />
               タスク
             </Link>
-            <Link href="/shifts/new" className="quick">
-              <Icon name="plus" />
-              出勤を登録
-            </Link>
+            {isManager ? (
+              <Link href="/shifts/new" className="quick">
+                <Icon name="plus" />
+                出勤を登録
+              </Link>
+            ) : (
+              <Link href="/availability" className="quick">
+                <Icon name="note" />
+                シフト希望
+              </Link>
+            )}
           </nav>
         </div>
       </div>
