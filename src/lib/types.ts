@@ -137,36 +137,6 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   todayDigest: true,
 };
 
-/** 広告（運営者が管理画面から登録する。保存先 ads/{ID}） */
-export interface Ad {
-  id: string;
-  title: string;
-  description: string;
-  /** 画像のURL（https のみ。空なら文字だけの広告） */
-  imageUrl: string;
-  /** 押したときに開くURL（https のみ。アフィリエイトのリンクなど） */
-  linkUrl: string;
-  /** 表示する場所。今はホームの下の方（home）だけ */
-  slot: 'home';
-  /** 表示の割合（1〜100）。大きいほどよく表示される */
-  weight: number;
-  status: 'active' | 'paused';
-  /** 掲載期間（空なら無期限） */
-  startDate: string;
-  endDate: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-/** 画面に渡す広告（クリックはサーバーを通して数えてから移動する） */
-export interface ServedAd {
-  id: string;
-  title: string;
-  description: string;
-  imageUrl: string;
-  clickUrl: string;
-}
-
 export const SHIFT_STATUS_LABEL: Record<ShiftStatus, string> = {
   confirmed: '確定',
   tentative: '未確定',

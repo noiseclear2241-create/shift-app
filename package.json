@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --experimental-strip-types --test src/lib/schedule.test.ts src/lib/notifications.test.ts src/lib/ads.test.ts",
+    "test": "node --experimental-strip-types --test src/lib/schedule.test.ts src/lib/notifications.test.ts",
     "dev:emulator": "firebase emulators:exec --only auth,firestore --project demo-shift \"next dev -p 3002\"",
     "test:rules": "firebase emulators:exec --only firestore --project demo-shift \"node --test tests/rules.test.mjs\""
   },

@@ -183,11 +183,6 @@ describe('ユーザー設定・サーバー専用のデータ', () => {
     await assertFails(getDoc(doc(as(STAFF), 'users', ADMIN)));
     await assertFails(setDoc(doc(as(STAFF), 'users', ADMIN, 'devices', 'd1'), { token: 'x' }));
   });
-  test('広告と、その表示・クリックの記録は画面から読み書きできない（サーバーのみ）', async () => {
-    await assertFails(getDoc(doc(as(OWNER), 'ads', 'ad1')));
-    await assertFails(setDoc(doc(as(OWNER), 'ads', 'ad1'), { title: 'x', linkUrl: 'https://evil.example' }));
-    await assertFails(setDoc(doc(as(OWNER), 'ads', 'ad1', 'stats', '2026-10-28'), { clicks: 999 }));
-  });
   test('招待と通知の送信記録は画面から読み書きできない', async () => {
     await assertFails(getDoc(doc(as(OWNER), 'invites', 'abc')));
     await assertFails(setDoc(doc(as(OWNER), 'invites', 'abc'), { workspaceId: TEAM, role: 'owner' }));
